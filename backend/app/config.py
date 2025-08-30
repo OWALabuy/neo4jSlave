@@ -11,9 +11,9 @@ class Settings:
     NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "password")
     NEO4J_DATABASE: str = os.getenv("NEO4J_DATABASE", "neo4j")
 
-    LLM_API_BASE: str = os.getenv("LLM_API_BASE", "https://api.openai.com/v1")
+    LLM_API_BASE: str = os.getenv("LLM_API_BASE", "https://ark.cn-beijing.volces.com/api/v3")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-3.5-turbo")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "Doubao-1.5-pro-32k")
 
     ENABLE_EXPLAIN_VALIDATE: bool = os.getenv("ENABLE_EXPLAIN_VALIDATE", "false").lower() == "true"
     QUERY_TIMEOUT_MS: int = int(os.getenv("QUERY_TIMEOUT_MS", "5000"))
