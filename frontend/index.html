@@ -102,9 +102,25 @@
           <div><strong>CQL</strong></div>
           <textarea id="cql" style="width: 100%; height: calc(100% - 24px);"></textarea>
         </div>
-        <div class="panel" style="height: 60%">
-          <div><strong>结果</strong></div>
-          <pre id="result"></pre>
+        <div class="panel" style="height: 28%">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <strong>Params (JSON)</strong>
+            <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" id="raw" /> 原始数据(raw)
+            </label>
+          </div>
+          <textarea id="params" style="width: 100%; height: calc(100% - 28px);"></textarea>
+        </div>
+        <div class="panel" style="height: 32%">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <strong>结果</strong>
+            <div role="tablist" aria-label="结果视图" style="display:flex;gap:6px;margin-left:8px;">
+              <button id="tab-text" class="icon-btn" role="tab" aria-selected="true">文本</button>
+              <button id="tab-json" class="icon-btn" role="tab" aria-selected="false">JSON</button>
+            </div>
+          </div>
+          <pre id="text-out" style="display:block; white-space:pre-wrap; word-break:break-word;"></pre>
+          <pre id="json-out" style="display:none; white-space:pre-wrap; word-break:break-word;"></pre>
         </div>
       </div>
       <div id="chart"></div>
@@ -115,12 +131,20 @@
       let chart = echarts.init(chartEl);
       const q = document.getElementById('q');
       const cqlEl = document.getElementById('cql');
-      const resultEl = document.getElementById('result');
+      const textOut = document.getElementById('text-out');
+      const jsonOut = document.getElementById('json-out');
+      const paramsEl = document.getElementById('params');
+      const rawEl = document.getElementById('raw');
+      const tabText = document.getElementById('tab-text');
+      const tabJson = document.getElementById('tab-json');
       const btnNlq = document.getElementById('btn-nlq');
       const btnRun = document.getElementById('btn-run');
       const btnTheme = document.getElementById('btn-theme');
       const exampleChips = Array.from(document.querySelectorAll('.chip'));
       let lastGraph = { nodes: [], links: [], meta: {} };
+      let lastParams = {};
+      let lastRaw = null;
+      let resultView = 'text';
 
       function cssVar(name) {
         return getComputedStyle(document.body).getPropertyValue(name).trim();
@@ -151,7 +175,7 @@
             roam: true,
             data: graph.nodes || [],
             links: graph.links || [],
-            categories: graph.categories || [],
+            categories: graph.categories || (graph.meta && graph.meta.categories) || [],
             label: { show: true, position: 'right', color: text, fontSize: 12 },
             force: { repulsion: 140, edgeLength: 90 },
             lineStyle: { color: muted, opacity: .8 },
@@ -171,7 +195,130 @@
 
       function showError(message, data) {
         const payload = data ? { error: message, detail: data } : { error: message };
-        resultEl.textContent = JSON.stringify(payload, null, 2);
+        if (resultView === 'text') {
+          textOut.textContent = JSON.stringify(payload, null, 2);
+        } else {
+          jsonOut.textContent = JSON.stringify(payload, null, 2);
+        }
+      }
+
+      function setResultView(view) {
+        resultView = view;
+        const isText = view === 'text';
+        tabText.setAttribute('aria-selected', String(isText));
+        tabJson.setAttribute('aria-selected', String(!isText));
+        textOut.style.display = isText ? 'block' : 'none';
+        jsonOut.style.display = isText ? 'none' : 'block';
+        renderResult();
+      }
+
+      function fmtVal(v) {
+        if (v === null || v === undefined) return 'null';
+        if (typeof v === 'string') return JSON.stringify(v);
+        if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+        if (Array.isArray(v)) return '[' + v.map(fmtVal).join(', ') + ']';
+        return JSON.stringify(v);
+      }
+
+      function nodeText(n) {
+        const labels = n.labels && n.labels.length ? ':' + n.labels.join(':') : '';
+        const props = n.properties || {};
+        const pairs = Object.keys(props).map(k => `${k}: ${fmtVal(props[k])}`).join(', ');
+        return `(${labels} {${pairs}})`;
+      }
+
+      function relText(r, dir) {
+        const t = r.type || 'REL';
+        const props = r.properties || {};
+        const pairs = Object.keys(props).map(k => `${k}: ${fmtVal(props[k])}`).join(', ');
+        const body = `[:${t}${pairs ? ' {' + pairs + '}' : ''}]`;
+        return dir === 'in' ? `<-${body}-` : `-${body}->`;
+      }
+
+      function pathToText(p) {
+        // p.kind === 'path' from normalized raw
+        const nodes = (p.nodes || []).map(nodeText);
+        const rels = (p.relationships || []).map((r) => relText(r, 'out'));
+        let s = '';
+        for (let i = 0; i < Math.max(nodes.length, rels.length); i++) {
+          if (nodes[i]) s += nodes[i];
+          if (rels[i]) s += rels[i];
+        }
+        return s;
+      }
+
+      function dictLooksLikeNode(d) {
+        return d && typeof d === 'object' && (d.ID !== undefined || d.Id !== undefined || d.id !== undefined || d.Name !== undefined || d.name !== undefined);
+      }
+
+      function inferNodeFromDict(d) {
+        const labels = [];
+        if (d.IsFollowMe !== undefined) labels.push('recipe');
+        if (d.MineTool !== undefined || d.ToolLevel !== undefined) labels.push('block');
+        if (!labels.length) labels.push('item');
+        return { labels, properties: d };
+      }
+
+      function listSequenceToText(arr) {
+        // e.g. [nodeDict, 'REL', nodeDict, 'REL', nodeDict]
+        let s = '';
+        let lastNode = null;
+        for (let i = 0; i < arr.length; i++) {
+          const it = arr[i];
+          if (Array.isArray(it)) { s += listSequenceToText(it); continue; }
+          if (it && typeof it === 'object') {
+            const n = dictLooksLikeNode(it) ? inferNodeFromDict(it) : { labels: [], properties: it };
+            s += nodeText(n);
+            lastNode = n;
+            continue;
+          }
+          if (typeof it === 'string' && i + 1 < arr.length && dictLooksLikeNode(arr[i+1]) && lastNode) {
+            s += relText({ type: it, properties: {} }, 'out');
+            const n2 = inferNodeFromDict(arr[i+1]);
+            s += nodeText(n2);
+            i += 1;
+            lastNode = n2;
+            continue;
+          }
+          // fallback
+          s += fmtVal(it);
+        }
+        return s;
+      }
+
+      function buildPrettyLines(raw) {
+        if (!raw) return ['<无原始数据；请勾选原始数据(raw)后再执行>'];
+        const lines = [];
+        for (const rec of raw) {
+          for (const k of Object.keys(rec)) {
+            const v = rec[k];
+            if (v && v.kind === 'path') {
+              lines.push(pathToText(v));
+            } else if (Array.isArray(v)) {
+              lines.push(listSequenceToText(v));
+            } else if (v && v.kind === 'node') {
+              lines.push(nodeText(v));
+            } else if (v && v.kind === 'relationship') {
+              lines.push(relText(v, 'out'));
+            } else if (v && typeof v === 'object') {
+              // maybe dict node
+              if (dictLooksLikeNode(v)) lines.push(nodeText(inferNodeFromDict(v)));
+              else lines.push(JSON.stringify(v));
+            } else {
+              lines.push(fmtVal(v));
+            }
+          }
+        }
+        return lines;
+      }
+
+      function renderResult() {
+        if (resultView === 'text') {
+          const lines = buildPrettyLines(lastRaw);
+          textOut.textContent = lines.join('\n');
+        } else {
+          jsonOut.textContent = JSON.stringify(lastGraph, null, 2);
+        }
       }
 
       async function callNlq() {
@@ -185,7 +332,7 @@
           const resp = await fetch('/nlq', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, options: { limit: 100 } })
+            body: JSON.stringify({ query, options: { limit: 100, debug_raw: !!(rawEl && rawEl.checked) } })
           });
           const data = await resp.json();
           if (!resp.ok) {
@@ -193,7 +340,12 @@
             return;
           }
           cqlEl.value = data.cql || '';
-          resultEl.textContent = JSON.stringify(data.graph?.meta || {}, null, 2);
+          lastParams = data.params || {};
+          if (paramsEl) paramsEl.value = JSON.stringify(lastParams, null, 2);
+          lastRaw = data.raw || null;
+          const meta = data.graph?.meta || {};
+          lastGraph = data.graph || { nodes: [], links: [], meta };
+          renderResult();
           renderGraph(data.graph || { nodes: [], links: [] });
         } catch (e) {
           showError('网络或服务异常', String(e));
@@ -207,17 +359,29 @@
         if (!cql) { cqlEl.focus(); return; }
         setLoading(true);
         try {
+          let params = {};
+          try {
+            const txt = (paramsEl?.value || '').trim();
+            params = txt ? JSON.parse(txt) : lastParams;
+          } catch (e) {
+            showError('Params JSON 解析失败', String(e));
+            setLoading(false);
+            return;
+          }
           const resp = await fetch('/run-cql', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cql, params: {} })
+            body: JSON.stringify({ cql, params, raw: rawEl && rawEl.checked })
           });
           const data = await resp.json();
           if (!resp.ok) {
             showError('执行失败', data);
             return;
           }
-          resultEl.textContent = JSON.stringify(data.graph?.meta || {}, null, 2);
+          lastRaw = data.raw || null;
+          const meta = data.graph?.meta || {};
+          lastGraph = data.graph || { nodes: [], links: [], meta };
+          renderResult();
           renderGraph(data.graph || { nodes: [], links: [] });
         } catch (e) {
           showError('网络或服务异常', String(e));
@@ -225,6 +389,9 @@
           setLoading(false);
         }
       }
+
+      tabText.addEventListener('click', () => setResultView('text'));
+      tabJson.addEventListener('click', () => setResultView('json'));
 
       function applyTheme(theme) {
         const isDark = theme === 'dark';

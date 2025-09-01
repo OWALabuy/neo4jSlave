@@ -1,3 +1,6 @@
 .env
 backend/app/__pycache__/
 .venv
+test/
+frontend/echarts-test.html
+frontend/test-graph.json
