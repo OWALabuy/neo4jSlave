@@ -105,9 +105,6 @@
         <div class="panel" style="height: 28%">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
             <strong>Params (JSON)</strong>
-            <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
-              <input type="checkbox" id="raw" /> 原始数据(raw)
-            </label>
           </div>
           <textarea id="params" style="width: 100%; height: calc(100% - 28px);"></textarea>
         </div>
@@ -117,10 +114,12 @@
             <div role="tablist" aria-label="结果视图" style="display:flex;gap:6px;margin-left:8px;">
               <button id="tab-text" class="icon-btn" role="tab" aria-selected="true">文本</button>
               <button id="tab-json" class="icon-btn" role="tab" aria-selected="false">JSON</button>
+              <button id="tab-table" class="icon-btn" role="tab" aria-selected="false">表格</button>
             </div>
           </div>
           <pre id="text-out" style="display:block; white-space:pre-wrap; word-break:break-word;"></pre>
           <pre id="json-out" style="display:none; white-space:pre-wrap; word-break:break-word;"></pre>
+          <div id="table-out" style="display:none; overflow:auto;"></div>
         </div>
       </div>
       <div id="chart"></div>
@@ -133,10 +132,11 @@
       const cqlEl = document.getElementById('cql');
       const textOut = document.getElementById('text-out');
       const jsonOut = document.getElementById('json-out');
+      const tableOut = document.getElementById('table-out');
       const paramsEl = document.getElementById('params');
-      const rawEl = document.getElementById('raw');
       const tabText = document.getElementById('tab-text');
       const tabJson = document.getElementById('tab-json');
+      const tabTable = document.getElementById('tab-table');
       const btnNlq = document.getElementById('btn-nlq');
       const btnRun = document.getElementById('btn-run');
       const btnTheme = document.getElementById('btn-theme');
@@ -144,6 +144,7 @@
       let lastGraph = { nodes: [], links: [], meta: {} };
       let lastParams = {};
       let lastRaw = null;
+      let lastTable = null;
       let resultView = 'text';
 
       function cssVar(name) {
@@ -205,10 +206,14 @@
       function setResultView(view) {
         resultView = view;
         const isText = view === 'text';
+        const isJson = view === 'json';
+        const isTable = view === 'table';
         tabText.setAttribute('aria-selected', String(isText));
-        tabJson.setAttribute('aria-selected', String(!isText));
+        tabJson.setAttribute('aria-selected', String(isJson));
+        tabTable.setAttribute('aria-selected', String(isTable));
         textOut.style.display = isText ? 'block' : 'none';
-        jsonOut.style.display = isText ? 'none' : 'block';
+        jsonOut.style.display = isJson ? 'block' : 'none';
+        tableOut.style.display = isTable ? 'block' : 'none';
         renderResult();
       }
 
@@ -316,8 +321,38 @@
         if (resultView === 'text') {
           const lines = buildPrettyLines(lastRaw);
           textOut.textContent = lines.join('\n');
-        } else {
+        } else if (resultView === 'json') {
           jsonOut.textContent = JSON.stringify(lastGraph, null, 2);
+        } else {
+          // 表格视图
+          tableOut.innerHTML = '';
+          const table = lastTable;
+          if (!table || !table.columns) { tableOut.textContent = '（无表格数据）'; return; }
+          const el = document.createElement('table');
+          el.style.borderCollapse = 'collapse';
+          el.style.width = '100%';
+          const th = document.createElement('tr');
+          for (const c of table.columns) {
+            const td = document.createElement('th');
+            td.textContent = c;
+            td.style.border = '1px solid #e5e7eb';
+            td.style.padding = '6px 8px';
+            td.style.textAlign = 'left';
+            th.appendChild(td);
+          }
+          el.appendChild(th);
+          for (const row of (table.rows || [])) {
+            const tr = document.createElement('tr');
+            for (const cell of row) {
+              const td = document.createElement('td');
+              td.textContent = (typeof cell === 'object') ? JSON.stringify(cell) : String(cell);
+              td.style.border = '1px solid #e5e7eb';
+              td.style.padding = '6px 8px';
+              tr.appendChild(td);
+            }
+            el.appendChild(tr);
+          }
+          tableOut.appendChild(el);
         }
       }
 
@@ -332,7 +367,7 @@
           const resp = await fetch('/nlq', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, options: { limit: 100, debug_raw: !!(rawEl && rawEl.checked) } })
+            body: JSON.stringify({ query, options: { limit: 100, debug_raw: true } })
           });
           const data = await resp.json();
           if (!resp.ok) {
@@ -345,6 +380,7 @@
           lastRaw = data.raw || null;
           const meta = data.graph?.meta || {};
           lastGraph = data.graph || { nodes: [], links: [], meta };
+          lastTable = data.table || null;
           renderResult();
           renderGraph(data.graph || { nodes: [], links: [] });
         } catch (e) {
@@ -371,7 +407,7 @@
           const resp = await fetch('/run-cql', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cql, params, raw: rawEl && rawEl.checked })
+            body: JSON.stringify({ cql, params, raw: true })
           });
           const data = await resp.json();
           if (!resp.ok) {
@@ -381,6 +417,7 @@
           lastRaw = data.raw || null;
           const meta = data.graph?.meta || {};
           lastGraph = data.graph || { nodes: [], links: [], meta };
+          lastTable = data.table || null;
           renderResult();
           renderGraph(data.graph || { nodes: [], links: [] });
         } catch (e) {
@@ -392,6 +429,7 @@
 
       tabText.addEventListener('click', () => setResultView('text'));
       tabJson.addEventListener('click', () => setResultView('json'));
+      tabTable.addEventListener('click', () => setResultView('table'));
 
       function applyTheme(theme) {
         const isDark = theme === 'dark';

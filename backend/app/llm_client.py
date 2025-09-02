@@ -47,6 +47,8 @@ class LLMClient:
                 - 不得使用 CREATE/MERGE/DELETE/SET/LOAD/CALL dbms.* 等写操作
                 - 对含糊需求先提出澄清问题；不得臆测不存在的标签/属性/关系
                 - 怪物蛋 item 的 ID-10000 = 怪物本体 ID 的规则可用于联结
+                - 对于用户的需求，尽量返回路径而不是节点或关系的单项属性。
+                - cql语句尽量简洁。
                 - 返回 JSON：{"cql": string, "params": object}，不要输出其它文本
                 '''
                 f"请为以下需求编写只读 Cypher，并尽量添加 LIMIT（默认 {limit or '100'}）：\n{nlq}"

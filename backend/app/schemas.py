@@ -35,5 +35,6 @@ class NLQResponse(BaseModel):
     graph: GraphPayload
     raw: Optional[List[Dict[str, Any]]] = None
     keys: Optional[List[str]] = None
+    table: Optional[Dict[str, Any]] = None
     raw: Optional[List[Dict[str, Any]]] = None
     keys: Optional[List[str]] = None

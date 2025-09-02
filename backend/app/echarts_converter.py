@@ -187,3 +187,30 @@ def normalize_value(value: Any) -> Any:
 def normalize_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [{k: normalize_value(v) for k, v in rec.items()} for rec in records]
 
+
+def build_table(records: List[Dict[str, Any]], keys: List[str]) -> Dict[str, Any]:
+    # 将任意结果构造成 columns + rows，以支持前端表格展示
+    columns = list(keys)
+    rows: List[List[Any]] = []
+    for rec in records:
+        row = []
+        for k in columns:
+            v = rec.get(k)
+            nv = normalize_value(v)
+            # 将复杂对象压缩为简短字符串，便于表格阅读
+            if isinstance(nv, dict) and nv.get("kind") == "node":
+                labels = ':'.join(nv.get('labels', []))
+                name = nv.get('properties', {}).get('Name') or nv.get('properties', {}).get('name')
+                nid = nv.get('elementId') or ''
+                row.append(f"(:{labels} {name or ''}) {nid}")
+            elif isinstance(nv, dict) and nv.get("kind") == "relationship":
+                rtype = nv.get('type')
+                props = nv.get('properties', {})
+                row.append(f"[:{rtype} {props}]")
+            elif isinstance(nv, dict) and nv.get("kind") == "path":
+                row.append("<path>")
+            else:
+                row.append(nv)
+        rows.append(row)
+    return {"columns": columns, "rows": rows}
+
