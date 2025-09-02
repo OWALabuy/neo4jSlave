@@ -111,6 +111,10 @@ def records_to_graph(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]
             for r in value.relationships:
                 add_rel(r)
             return
+        # 字典节点（非路径）也应当被收集，以显示孤立节点
+        if isinstance(value, dict) and dict_is_node(value):
+            add_node_dict(value)
+            return
         # 列表/元组：递归提取
         if isinstance(value, (list, tuple)):
             # 尝试识别形如 [nodeDict, 'REL', nodeDict, 'REL', nodeDict] 的路径序列
