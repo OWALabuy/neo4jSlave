@@ -67,7 +67,7 @@ def run_cql(payload: RunCQLRequest) -> Dict[str, Any]:
         records, keys = neo4j_client.run_read(payload.cql, payload.params or {})
         nodes, links = records_to_graph(records)
         table = build_table(records, keys)
-        categories = sorted({n.get("category", "Node") for n in nodes})
+        categories = sorted({str(n.get("category", "Node") or "Node") for n in nodes})
         categories_payload = [{"name": c} for c in categories]
         resp: Dict[str, Any] = {
             "graph": {
@@ -110,7 +110,7 @@ async def nlq(payload: NLQRequest) -> NLQResponse:
         records, keys = neo4j_client.run_read(cql, params)
         nodes, links = records_to_graph(records)
         table = build_table(records, keys)
-        categories = sorted({n.get("category", "Node") for n in nodes})
+        categories = sorted({str(n.get("category", "Node") or "Node") for n in nodes})
         categories_payload = [{"name": c} for c in categories]
         return NLQResponse(
             cql=cql,
