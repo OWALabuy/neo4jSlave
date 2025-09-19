@@ -27,7 +27,7 @@ neo4jSlave/
 
 ### 先决条件
 - Python 3.10+
-- 已有可访问的 Neo4j 实例（建议只读账号）
+- 可访问的 Neo4j 或阿里云 GDB 实例（建议只读账号）
 
 ### 快速开始（Linux *sh / Windows PowerShell）
 
@@ -49,31 +49,33 @@ Windows
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env
-# 编辑 .env，填入你的 NEO4J 与 LLM 配置
+# 在项目根新建 config.json，填入你的连接与 LLM 配置
+New-Item -Path . -Name config.json -ItemType File
+
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 启动后访问：`http://localhost:8000` 打开可视化页面。
 
-### 环境变量（.env）
-```
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
-NEO4J_DATABASE=neo4j
+### 配置文件（config.json）
+放在项目根目录，示例：
+```json
+{
+  "GRAPH_VENDOR": "gdb",                 
+  "NEO4J_USE_DATABASE_PARAM": false,     
+  "NEO4J_URI": "bolt://localhost:7687",
+  "NEO4J_USER": "neo4j",
+  "NEO4J_PASSWORD": "password",
+  "NEO4J_DATABASE": "neo4j",
 
-# LLM（OpenAI 兼容）：
-LLM_API_BASE=https://api.openai.com/v1
-LLM_API_KEY=sk-xxxx
-LLM_MODEL=gpt-4o-mini
+  "LLM_API_BASE": "https://ark.cn-beijing.volces.com/api/v3",
+  "LLM_API_KEY": "",
+  "LLM_MODEL": "Doubao-1.5-pro-32k",
 
-# 可选：启用 EXPLAIN 校验
-ENABLE_EXPLAIN_VALIDATE=false
-
-# 执行限制
-QUERY_TIMEOUT_MS=5000
-QUERY_HARD_LIMIT=200
+  "ENABLE_EXPLAIN_VALIDATE": false,
+  "QUERY_TIMEOUT_MS": 5000,
+  "QUERY_HARD_LIMIT": 200
+}
 ```
 
 ### API 概览
@@ -99,3 +101,10 @@ QUERY_HARD_LIMIT=200
 - 路径查询、邻居展开、分页与聚类
 - Schema 统计增强（属性 Top-N）
 - 角色权限与审计日志
+
+### GDB 兼容说明（Neo4j 3.5.x 驱动）
+- GDB 推荐使用 Neo4j Python 驱动 1.7.x（例如 1.7.6）。你可以执行：
+  - `pip install -r requirements-neo4j17.txt`
+- 使用上面的 `config.json` 配置：
+  - `GRAPH_VENDOR` 设为 `gdb`
+  - `NEO4J_USE_DATABASE_PARAM` 设为 `false`（GDB 无多数据库，传 `database` 会报错）

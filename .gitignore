@@ -4,3 +4,4 @@ backend/app/__pycache__/
 test/
 frontend/echarts-test.html
 frontend/test-graph.json
+config.json

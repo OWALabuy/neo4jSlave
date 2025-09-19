@@ -1,11 +1,27 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Set, Tuple
-from neo4j import graph
+try:
+    # neo4j 4.x/5.x
+    from neo4j import graph  # type: ignore
+except Exception:  # pragma: no cover - 1.7.x 兼容
+    graph = None  # 动态类型检查时再判断属性
 
 
-def _node_id(n: graph.Node) -> str:
-    return str(n.element_id) if hasattr(n, "element_id") else str(n.id)
+def _node_id(n: Any) -> str:
+    return str(getattr(n, "element_id", None) or getattr(n, "elementId", None) or getattr(n, "id", ""))
+
+
+def _looks_like_node(obj: Any) -> bool:
+    return hasattr(obj, "labels") and hasattr(obj, "__iter__")
+
+
+def _looks_like_relationship(obj: Any) -> bool:
+    return (hasattr(obj, "type") and (hasattr(obj, "start_node") or hasattr(obj, "start")) and (hasattr(obj, "end_node") or hasattr(obj, "end")))
+
+
+def _looks_like_path(obj: Any) -> bool:
+    return hasattr(obj, "nodes") and hasattr(obj, "relationships")
 
 
 def records_to_graph(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -14,39 +30,48 @@ def records_to_graph(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]
     seen_nodes: Set[str] = set()
     seen_edges: Set[str] = set()
 
-    def add_node(n: graph.Node) -> None:
+    def add_node(n: Any) -> None:
         nid = _node_id(n)
         if nid in seen_nodes:
             return
-        label = next(iter(n.labels), "Node")
-        name = n.get("name") or n.get("Name") or nid
+        labels = list(getattr(n, "labels", []) or [])
+        label = next(iter(labels), "Node")
+        # 节点属性字典
+        props = dict(n) if hasattr(n, "__iter__") else {}
+        name = props.get("name") or props.get("Name") or nid
         nodes.append(
             {
                 "id": nid,
                 "name": str(name),
                 "category": label,
                 "symbolSize": 30,
-                "value": dict(n),
+                "value": props,
             }
         )
         seen_nodes.add(nid)
 
-    def add_rel(rel: graph.Relationship) -> None:
-        src = _node_id(rel.start_node)
-        tgt = _node_id(rel.end_node)
-        edge_key = f"{src}->{tgt}:{rel.type}"
+    def add_rel(rel: Any) -> None:
+        src_node = getattr(rel, "start_node", None) or getattr(rel, "start", None)
+        tgt_node = getattr(rel, "end_node", None) or getattr(rel, "end", None)
+        src = _node_id(src_node)
+        tgt = _node_id(tgt_node)
+        rtype = getattr(rel, "type", None) or getattr(rel, "__class__", type("", (), {}))
+        rtype_str = rtype if isinstance(rtype, str) else getattr(rtype, "__name__", "REL")
+        edge_key = f"{src}->{tgt}:{rtype_str}"
         if edge_key in seen_edges:
             return
         # 确保端点节点也在集合中
-        add_node(rel.start_node)
-        add_node(rel.end_node)
+        if src_node is not None:
+            add_node(src_node)
+        if tgt_node is not None:
+            add_node(tgt_node)
         links.append(
             {
                 "source": src,
                 "target": tgt,
-                "category": rel.type,
-                "label": rel.type,
-                "value": dict(rel),
+                "category": rtype_str,
+                "label": rtype_str,
+                "value": dict(rel) if hasattr(rel, "__iter__") else {},
             }
         )
         seen_edges.add(edge_key)
@@ -98,17 +123,17 @@ def records_to_graph(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]
 
     def extract(value: Any) -> None:
         # 直接的节点/关系
-        if isinstance(value, graph.Node):
+        if (graph is not None and isinstance(value, getattr(graph, "Node", tuple()))) or _looks_like_node(value):
             add_node(value)
             return
-        if isinstance(value, graph.Relationship):
+        if (graph is not None and isinstance(value, getattr(graph, "Relationship", tuple()))) or _looks_like_relationship(value):
             add_rel(value)
             return
         # 路径：展开其中的所有节点和关系
-        if isinstance(value, graph.Path):
-            for n in value.nodes:
+        if (graph is not None and isinstance(value, getattr(graph, "Path", tuple()))) or _looks_like_path(value):
+            for n in getattr(value, "nodes", []) or []:
                 add_node(n)
-            for r in value.relationships:
+            for r in getattr(value, "relationships", []) or []:
                 add_rel(r)
             return
         # 字典节点（非路径）也应当被收集，以显示孤立节点
@@ -159,26 +184,26 @@ def records_to_graph(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]
 
 def normalize_value(value: Any) -> Any:
     # 规范化为可 JSON 序列化且保留语义的结构
-    if isinstance(value, graph.Node):
+    if (graph is not None and isinstance(value, getattr(graph, "Node", tuple()))) or _looks_like_node(value):
         return {
             "kind": "node",
-            "labels": list(value.labels),
+            "labels": list(getattr(value, "labels", []) or []),
             "properties": dict(value),
             "elementId": getattr(value, "element_id", None) or getattr(value, "elementId", None),
         }
-    if isinstance(value, graph.Relationship):
+    if (graph is not None and isinstance(value, getattr(graph, "Relationship", tuple()))) or _looks_like_relationship(value):
         return {
             "kind": "relationship",
-            "type": value.type,
+            "type": getattr(value, "type", None),
             "properties": dict(value),
-            "startElementId": getattr(value, "start_node", None) and (getattr(value.start_node, "element_id", None) or getattr(value.start_node, "elementId", None)),
-            "endElementId": getattr(value, "end_node", None) and (getattr(value.end_node, "element_id", None) or getattr(value.end_node, "elementId", None)),
+            "startElementId": getattr(getattr(value, "start_node", None), "element_id", None) or getattr(getattr(value, "start_node", None), "elementId", None),
+            "endElementId": getattr(getattr(value, "end_node", None), "element_id", None) or getattr(getattr(value, "end_node", None), "elementId", None),
         }
-    if isinstance(value, graph.Path):
+    if (graph is not None and isinstance(value, getattr(graph, "Path", tuple()))) or _looks_like_path(value):
         return {
             "kind": "path",
-            "nodes": [normalize_value(n) for n in value.nodes],
-            "relationships": [normalize_value(r) for r in value.relationships],
+            "nodes": [normalize_value(n) for n in getattr(value, "nodes", []) or []],
+            "relationships": [normalize_value(r) for r in getattr(value, "relationships", []) or []],
         }
     if isinstance(value, (list, tuple)):
         return [normalize_value(v) for v in value]
