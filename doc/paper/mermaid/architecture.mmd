@@ -1,0 +1,33 @@
+graph TB
+    subgraph 前端层["前端层 (Frontend)"]
+        UI[网页界面<br/>HTML/CSS/JS]
+        ECharts[ECharts 图谱可视化]
+    end
+
+    subgraph 后端层["后端层 (Backend)"]
+        API[FastAPI 服务]
+        NLQ[自然语言查询模块]
+        CQL[CQL 执行模块]
+        Security[安全校验模块]
+        Convert[数据转换模块]
+    end
+
+    subgraph 外部服务["外部服务"]
+        LLM[大语言模型 API]
+    end
+
+    subgraph 数据层["数据层"]
+        Neo4j[(Neo4j 图数据库)]
+    end
+
+    UI -->|HTTP/REST| API
+    API --> NLQ
+    API --> CQL
+    API --> Convert
+    NLQ -->|生成 Cypher| LLM
+    CQL --> Security
+    NLQ --> Security
+    Security -->|只读查询| Neo4j
+    Neo4j -->|查询结果| Convert
+    Convert -->|图数据/表格| ECharts
+    Convert -->|原始数据| UI

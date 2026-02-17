@@ -1,0 +1,27 @@
+sequenceDiagram
+    actor User as 用户
+    participant UI as 前端界面
+    participant API as FastAPI
+    participant LLM as 大语言模型
+    participant Security as 安全校验
+    participant Neo4j as Neo4j
+
+    User->>UI: 输入自然语言查询
+    UI->>API: POST /nlq {query}
+    API->>Neo4j: 获取 Schema 信息
+    Neo4j-->>API: 返回标签/关系类型
+    API->>LLM: 发送 Prompt<br/>(Schema + 用户查询)
+    LLM-->>API: 返回 Cypher + 参数
+    API->>Security: 只读校验
+    alt 校验通过
+        Security-->>API: 安全
+        API->>Neo4j: 执行查询
+        Neo4j-->>API: 返回结果
+        API->>API: 转换为 ECharts 格式
+        API-->>UI: 返回图数据 + CQL
+        UI->>UI: 渲染知识图谱
+    else 校验失败
+        Security-->>API: 不安全操作
+        API-->>UI: 返回 400 错误
+    end
+    UI-->>User: 展示结果/错误

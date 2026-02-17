@@ -1,0 +1,18 @@
+flowchart TD
+    A[接收 CQL 语句] --> B[黑名单检查]
+    B --> C{匹配写操作<br/>关键字?}
+    C -->|是| D[拒绝执行<br/>返回 400]
+    C -->|否| E{EXPLAIN<br/>校验启用?}
+    E -->|是| F[执行 EXPLAIN]
+    F --> G{EXPLAIN<br/>通过?}
+    G -->|否| D
+    G -->|是| H[提取参数占位符]
+    E -->|否| H
+    H --> I{参数<br/>完整?}
+    I -->|否| J[返回缺少参数错误]
+    I -->|是| K[执行查询]
+    K --> L[返回结果]
+
+    style D fill:#ffcccc
+    style J fill:#ffcccc
+    style L fill:#ccffcc

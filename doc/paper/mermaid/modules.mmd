@@ -1,0 +1,25 @@
+graph LR
+    subgraph 系统功能模块
+        A[自然语言查询模块] --> B[Cypher生成]
+        A --> C[参数提取]
+        
+        D[CQL执行模块] --> E[直接执行]
+        D --> F[参数校验]
+        
+        G[安全校验模块] --> H[黑名单检查]
+        G --> I[EXPLAIN预检]
+        G --> J[参数注入防护]
+        
+        K[可视化模块] --> L[图数据转换]
+        K --> M[表格构建]
+        K --> N[ECharts渲染]
+        
+        O[Schema模块] --> P[标签查询]
+        O --> Q[关系类型查询]
+    end
+
+    style A fill:#e1f5ff
+    style D fill:#e1f5ff
+    style G fill:#ffe1e1
+    style K fill:#e1ffe1
+    style O fill:#ffffe1
