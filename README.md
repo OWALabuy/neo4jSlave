@@ -99,3 +99,74 @@ QUERY_HARD_LIMIT=200
 - 路径查询、邻居展开、分页与聚类
 - Schema 统计增强（属性 Top-N）
 - 角色权限与审计日志
+
+## 测试
+
+### 测试框架
+项目使用 **pytest** 进行单元测试和集成测试，确保代码质量和功能稳定性。
+
+### 测试结构
+```
+tests/
+├── conftest.py              # 测试 fixtures 和配置
+├── test_cql_validator.py    # CQL 验证器单元测试
+├── test_echarts_converter.py # ECharts 转换器测试
+└── test_api.py              # API 集成测试 (使用 Mock)
+```
+
+### 运行测试
+
+**一键运行所有测试：**
+```bash
+./run_tests.sh
+```
+
+**使用 pytest 直接运行：**
+```bash
+# 运行所有测试
+python -m pytest tests/ -v
+
+# 运行特定测试文件
+python -m pytest tests/test_cql_validator.py -v
+
+# 运行特定测试类
+python -m pytest tests/test_cql_validator.py::TestIsReadonlyCQL -v
+
+# 显示覆盖率报告（需安装 pytest-cov）
+python -m pytest tests/ --cov=backend/app --cov-report=html
+```
+
+### 测试覆盖范围
+
+| 模块 | 测试内容 | 测试数量 |
+|------|---------|---------|
+| `cql_validator` | 只读 CQL 验证、黑名单检查 | 18+ |
+| `echarts_converter` | 图数据转换、表格构建 | 13+ |
+| `api` | 端点响应、错误处理、Mock 集成 | 7+ |
+
+### 编写新测试
+
+参考 `tests/conftest.py` 中的 fixtures，使用示例：
+
+```python
+# tests/test_example.py
+import pytest
+from app.some_module import some_function
+
+def test_something():
+    result = some_function("input")
+    assert result == "expected_output"
+
+@pytest.mark.parametrize("input,expected", [
+    ("input1", "output1"),
+    ("input2", "output2"),
+])
+def test_multiple_cases(input, expected):
+    assert some_function(input) == expected
+```
+
+### CI/CD 测试
+在提交代码前，请确保：
+1. 所有测试通过：`python -m pytest tests/`
+2. 代码风格检查（推荐添加 `black` 和 `flake8`）
+3. 类型检查（可选，使用 `mypy`）
