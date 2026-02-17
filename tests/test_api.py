@@ -113,15 +113,18 @@ class TestRunCQLEndpoint:
 class TestNLQEndpoint:
     """测试自然语言查询端点 /nlq"""
 
+    @patch("app.main.neo4j_client.get_schema")
     @patch("app.main.llm_client.generate_cypher")
     @patch("app.main.is_readonly_cql")
     @patch("app.main.explain_safe")
     @patch("app.main.neo4j_client.run_read")
     def test_nlq_success(
-        self, mock_run_read, mock_explain_safe, 
-        mock_is_readonly, mock_generate_cypher, client
+        self, mock_run_read, mock_explain_safe,
+        mock_is_readonly, mock_generate_cypher, mock_get_schema, client
     ):
         """测试 NLQ 成功流程"""
+        # Mock schema
+        mock_get_schema.return_value = {"labels": ["Person"], "relTypes": []}
         # Mock LLM 生成 CQL
         mock_generate_cypher.return_value = (
             "MATCH (n:Person) RETURN n LIMIT 10",
@@ -133,43 +136,47 @@ class TestNLQEndpoint:
             [{"n": {"id": 1, "name": "Alice", "labels": ["Person"]}}],
             ["n"]
         )
-        
+
         response = client.post("/nlq", json={
             "query": "查找所有人",
             "options": {"limit": 10}
         })
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "cql" in data
         assert "graph" in data
 
+    @patch("app.main.neo4j_client.get_schema")
     @patch("app.main.llm_client.generate_cypher")
-    def test_nlq_llm_fails(self, mock_generate_cypher, client):
+    def test_nlq_llm_fails(self, mock_generate_cypher, mock_get_schema, client):
         """测试 LLM 生成失败"""
+        mock_get_schema.return_value = {"labels": [], "relTypes": []}
         mock_generate_cypher.return_value = ("", {})
-        
+
         response = client.post("/nlq", json={
             "query": "复杂查询"
         })
-        
+
         assert response.status_code == 400
         assert "未生成" in response.json()["detail"]
 
+    @patch("app.main.neo4j_client.get_schema")
     @patch("app.main.llm_client.generate_cypher")
     @patch("app.main.is_readonly_cql")
     def test_nlq_unsafe_cql_blocked(
-        self, mock_is_readonly, mock_generate_cypher, client
+        self, mock_is_readonly, mock_generate_cypher, mock_get_schema, client
     ):
         """测试 NLQ 生成的不安全 CQL 被阻止"""
+        mock_get_schema.return_value = {"labels": [], "relTypes": []}
         mock_generate_cypher.return_value = (
             "CREATE (n:Person {name: 'Alice'})",
             {}
         )
         mock_is_readonly.return_value = (False, "包含写操作")
-        
+
         response = client.post("/nlq", json={
             "query": "创建一个人"
         })
-        
+
         assert response.status_code == 400

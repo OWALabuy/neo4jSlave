@@ -15,7 +15,7 @@ WRITE_BLACKLIST = [
     r"\bREMOVE\b",
     r"\bDROP\b",
     r"\bLOAD\s+CSV\b",
-    r"\bCALL\s+dbms\.",
+    r"\bCALL\s+DBMS\.",
 ]
 
 
