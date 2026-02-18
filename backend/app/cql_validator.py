@@ -13,7 +13,7 @@ WRITE_BLACKLIST = [
     r"\bDETACH\s+DELETE\b",
     r"\bSET\b",
     r"\bREMOVE\b",
-    r"\bDROP\b",
+    r"\bDROP\s+(?:INDEX|CONSTRAINT|NODE\s+LABEL|REL\s+TYPE|PROPERTY)\b",
     r"\bLOAD\s+CSV\b",
     r"\bCALL\s+DBMS\.",
 ]

@@ -4,8 +4,12 @@
 
 ### 节点类型 (Labels)
 - **item** - 游戏道具/物品，属性: ID, Name, Type, Disc(描述), GetWay(获取方式), EggItemID
+  - 注意: 生物蛋也是item，Name是生物名称，EggItemID=自身ID
+  - 生物实体(:monster)的ID = 生物蛋ID - 10000
 - **block** - 方块，属性: ID, MineTool(挖掘工具), ToolLevel(工具等级)
+  - 注意: 方块与道具通过相同ID关联，block.ID = item.ID
 - **monster** - 生物/怪物，属性: ID, Life(生命值), Attack(攻击力)
+  - 注意: monster本身没有Name，需要通过 item.EggItemID = monster.ID + 10000 关联获取名称
 - **group** - 物品分组/类别，属性: ID
 - **recipe** - 合成配方，属性: ID, IsFollowMe(合成台类型), StationLabel
 
@@ -20,6 +24,23 @@
 - **PRECISE_DROP** - (block)-[:PRECISE_DROP]->(item) - 精准采集掉落
 - **DROPS** - (monster)-[:DROPS]->(item) - 生物击败掉落
 - **FUEL_FOR** - (item)-[:FUEL_FOR]->(item) - 可作为燃料
+
+## 重要提示
+
+1. **生物名称查询** - monster没有Name属性，需要通过生物蛋关联:
+   ```cypher
+   MATCH (i:item) WHERE i.Name CONTAINS '野人' AND i.EggItemID IS NOT NULL
+   WITH i.EggItemID - 10000 AS monsterId
+   MATCH (m:monster {ID: monsterId})-[r:DROPS]->(item:item)
+   RETURN m, item
+   ```
+
+2. **方块与道具关联** - block和item通过相同ID关联:
+   ```cypher
+   MATCH (bi:item) WHERE bi.Name CONTAINS '石头'
+   MATCH (b:block {ID: bi.ID})-[:TOOL_MINE_DROPS]->(i:item)
+   RETURN b, i
+   ```
 
 ## 查询规则
 
@@ -40,17 +61,17 @@ CQL: MATCH (n:item) WHERE n.Name CONTAINS '石剑' RETURN n LIMIT 10
 用户: "石剑怎么合成"
 CQL: MATCH (r:recipe)-[:PRODUCES]->(p:item) WHERE p.Name CONTAINS '石剑' MATCH (r)-[:CONSUMES]->(c) RETURN r, p, c LIMIT 20
 
-### 示例3: 查找方块掉落
-用户: "石头用什么工具挖"
-CQL: MATCH (b:block)-[:TOOL_MINE_DROPS]->(i:item) WHERE b.ID = 1 OR EXISTS {MATCH (bi:item) WHERE bi.ID = b.ID AND bi.Name CONTAINS '石头'} RETURN b, i LIMIT 10
-
-### 示例4: 查找生物掉落
+### 示例3: 查找生物掉落
 用户: "击败野人会掉落什么"
-CQL: MATCH (m:monster)-[:DROPS]->(i:item) WHERE m.Name CONTAINS '野人' RETURN m, i LIMIT 10
+CQL: MATCH (i:item) WHERE i.Name CONTAINS '野人' AND i.EggItemID IS NOT NULL WITH i.EggItemID - 10000 AS mid MATCH (m:monster {ID: mid})-[:DROPS]->(drop:item) RETURN m, drop LIMIT 10
+
+### 示例4: 查找方块掉落
+用户: "石头用什么工具挖"
+CQL: MATCH (bi:item) WHERE bi.Name CONTAINS '石头' MATCH (b:block {ID: bi.ID})-[:TOOL_MINE_DROPS]->(tool:item) RETURN b, tool LIMIT 10
 
 ### 示例5: 查找分组物品
-用户: "所有武器类道具"
-CQL: MATCH (i:item)-[:IN_GROUP]->(g:group) WHERE g.ID = 1 RETURN i LIMIT 50
+用户: "查找斧头"
+CQL: MATCH (i:item) WHERE i.Name CONTAINS '斧' RETURN i LIMIT 10
 
 ## 输出格式
 
