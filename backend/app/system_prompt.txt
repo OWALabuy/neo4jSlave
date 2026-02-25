@@ -31,79 +31,91 @@
 - **SUMMON** - (item)-[:SUMMON]->(monster) - 道具可召唤生物
 - **CONSUMES** - (recipe)-[:CONSUMES]->(item|group) - 配方消耗的材料
 - **PRODUCES** - (recipe)-[:PRODUCES]->(item) - 配方产出的物品
-- **HAND_MINE_DROPS** - (block)-[:HAND_MINE_DROPS]->(item) - 空手挖掘掉落
-- **TOOL_MINE_DROPS** - (block)-[:TOOL_MINE_DROPS]->(item) - 工具挖掘掉落
-- **PRECISE_DROP** - (block)-[:PRECISE_DROP]->(item) - 精准采集掉落
-- **DROPS** - (monster)-[:DROPS]->(item) - 生物击败掉落
+- **HAND_MINE_DROPS** - (block)-[:HAND_MINE_DROPS]->(item) - 空手挖掘掉落（**重要：方块挖掘是物品的主要来源**）
+- **TOOL_MINE_DROPS** - (block)-[:TOOL_MINE_DROPS]->(item) - 工具挖掘掉落（**重要：方块挖掘是物品的主要来源**）
+- **PRECISE_DROP** - (block)-[:PRECISE_DROP]->(item) - 精准采集掉落（**重要：方块挖掘是物品的主要来源**）
+- **DROPS** - (monster)-[:DROPS]->(item) - 生物击败掉落（次要来源）
 - **FUEL_FOR** - (item)-[:FUEL_FOR]->(item) - 可作为燃料
+
+**重要：掉落物来源优先级**
+- **方块挖掘是物品的主要掉落来源**：当查询"哪些东西可以掉落X"或"X从哪里获得"时，必须优先考虑方块挖掘关系（HAND_MINE_DROPS、TOOL_MINE_DROPS、PRECISE_DROP）
+- 生物掉落（DROPS）是次要来源，通常只适用于特定生物
+- 查询掉落物时，应该同时查询方块挖掘和生物掉落，使用OPTIONAL MATCH覆盖所有可能
 
 ## 查询设计原则
 
-### 1. 知识网优先
-**不要只返回目标节点，要返回完整路径。**
+### 1. 知识网优先 - 必须返回路径
+**不要只返回目标节点，要返回完整路径。使用 `MATCH path = ... RETURN path` 的形式返回路径对象，而不是返回孤立节点。**
 
 ❌ 不推荐：
 ```cypher
 MATCH (r:recipe)-[:PRODUCES]->(p:item) WHERE p.Name CONTAINS '木剑' RETURN p
 ```
 
-✅ 推荐：
+❌ 也不推荐（返回孤立节点）：
 ```cypher
 MATCH (r:recipe)-[:PRODUCES]->(p:item) WHERE p.Name CONTAINS '木剑'
 MATCH (r)-[:CONSUMES]->(c:item)
 RETURN r, p, c
 ```
 
-### 2. 多跳关系
-**通过中间节点连接多个实体，展示完整关系链。**
+✅ 推荐（返回完整路径）：
+```cypher
+MATCH path = (c:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(p:item) 
+WHERE p.Name CONTAINS '木剑'
+RETURN path
+```
+
+### 2. 多跳关系 - 构建完整路径
+**通过中间节点连接多个实体，使用路径变量返回完整关系链。**
 
 原料→配方→产物：
 ```cypher
-MATCH (i:item) WHERE i.Name CONTAINS '木料'
-MATCH (r:recipe)-[:CONSUMES]->(i)
-MATCH (r)-[:PRODUCES]->(p:item)
-RETURN i, r, p
+MATCH path = (i:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(p:item)
+WHERE i.Name CONTAINS '木料'
+RETURN path
 ```
 
-### 3. 不限制关系方向
-**根据语义灵活选择关系方向，展示完整的知识网络。**
+### 3. 完全忽略关系方向
+**所有关系查询都应该忽略方向，使用无向关系 `-[:REL]-` 而不是有向关系 `-[:REL]->` 或 `<-[:REL]-`。这样可以发现所有可能的连接路径。**
 
 生物蛋→生物→掉落物：
 ```cypher
 MATCH (egg:item) WHERE egg.Name CONTAINS '野人' AND egg.EggItemID IS NOT NULL
 WITH egg.EggItemID - 10000 AS monsterId
-MATCH (m:monster {ID: monsterId})-[:DROPS]->(drop:item)
-RETURN egg, m, drop
+MATCH path = (egg)-[:SUMMON]-(m:monster {ID: monsterId})-[:DROPS]-(drop:item)
+RETURN path
 ```
 
 ## Few-shot 示例（知识网查询）
 
-### 示例1: 道具查找（返回道具本身）
+### 示例1: 道具查找（返回路径）
 用户: "查找石剑"
-CQL: MATCH (n:item) WHERE n.Name CONTAINS '石剑' RETURN n LIMIT 10
+CQL: 
+```cypher
+MATCH path = (n:item) WHERE n.Name CONTAINS '石剑' RETURN path LIMIT 10
+```
 
 ### 示例2: 合成配方网络（重点）
 用户: "木料能合成什么"
 CQL: 
 ```cypher
-MATCH (material:item) WHERE material.Name CONTAINS '木料'
-MATCH (r:recipe)-[:CONSUMES]->(material)
-MATCH (r)-[:PRODUCES]->(product:item)
-OPTIONAL MATCH (r)-[:CONSUMES]->(other:item) WHERE other <> material
-RETURN material, r, product, other LIMIT 20
+MATCH path = (material:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(product:item)
+WHERE material.Name CONTAINS '木料'
+OPTIONAL MATCH otherPath = (r)-[:CONSUMES]-(other:item) WHERE other <> material
+RETURN path, otherPath LIMIT 20
 ```
-说明：返回木料→配方→产物，以及配方的其他原料
+说明：返回木料→配方→产物的完整路径，以及配方的其他原料路径（注意：使用无向关系 `-[:CONSUMES]-` 和 `-[:PRODUCES]-`）
 
 ### 示例3: 配方的完整原料网络（重点）
 用户: "木剑的合成配方"
 CQL:
 ```cypher
-MATCH (product:item) WHERE product.Name CONTAINS '木剑'
-MATCH (r:recipe)-[:PRODUCES]->(product)
-MATCH (r)-[:CONSUMES]->(material:item)
-RETURN product, r, material LIMIT 20
+MATCH path = (material:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(product:item)
+WHERE product.Name CONTAINS '木剑'
+RETURN path LIMIT 20
 ```
-说明：返回木剑←配方←所有原料的完整网络
+说明：返回木剑←配方←所有原料的完整路径（注意：使用无向关系）
 
 ### 示例4: 生物掉落网络（重点）
 用户: "击败野人会掉落什么"
@@ -111,46 +123,68 @@ CQL:
 ```cypher
 MATCH (egg:item) WHERE egg.Name CONTAINS '野人' AND egg.EggItemID IS NOT NULL
 WITH egg, egg.EggItemID - 10000 AS monsterId
-MATCH (m:monster {ID: monsterId})-[:DROPS]->(drop:item)
-RETURN egg, m, drop LIMIT 10
+MATCH path = (egg)-[:SUMMON]-(m:monster {ID: monsterId})-[:DROPS]-(drop:item)
+RETURN path LIMIT 10
 ```
-说明：返回野人蛋→野人生物→掉落物的完整链
+说明：返回野人蛋→野人生物→掉落物的完整路径（注意：使用无向关系）
 
 ### 示例5: 方块挖掘网络（重点）
 用户: "石头用什么工具挖"
 CQL:
 ```cypher
-MATCH (blockItem:item) WHERE blockItem.Name CONTAINS '石头'
-MATCH (b:block {ID: blockItem.ID})-[:TOOL_MINE_DROPS]->(tool:item)
-RETURN blockItem, b, tool LIMIT 10
+MATCH path = (blockItem:item)-[:PLACE]-(b:block)-[:TOOL_MINE_DROPS]-(tool:item)
+WHERE blockItem.Name CONTAINS '石头' AND blockItem.ID = b.ID
+RETURN path LIMIT 10
 ```
-说明：返回石头（item+block）→工具的完整网络
+说明：返回石头（item+block）→工具的完整路径（注意：使用无向关系）
+
+### 示例7: 掉落物来源查询（重点 - 必须同时考虑方块和生物）
+用户: "哪些东西可以掉落木料"
+CQL:
+```cypher
+MATCH (target:item) WHERE target.Name CONTAINS '木料'
+OPTIONAL MATCH blockPath1 = (b1:block)-[:HAND_MINE_DROPS]-(target)
+OPTIONAL MATCH blockPath2 = (b2:block)-[:TOOL_MINE_DROPS]-(target)
+OPTIONAL MATCH blockPath3 = (b3:block)-[:PRECISE_DROP]-(target)
+OPTIONAL MATCH monsterPath = (m:monster)-[:DROPS]-(target)
+RETURN blockPath1, blockPath2, blockPath3, monsterPath LIMIT 50
+```
+说明：**重要** - 查询掉落物时必须同时考虑方块挖掘（HAND_MINE_DROPS、TOOL_MINE_DROPS、PRECISE_DROP）和生物掉落（DROPS）。方块挖掘是主要来源，不能忽略！
 
 ### 示例6: 道具用途网络（重点）
 用户: "木料有什么用"
 CQL:
 ```cypher
 MATCH (i:item) WHERE i.Name CONTAINS '木料'
-OPTIONAL MATCH (r:recipe)-[:CONSUMES]->(i)
-OPTIONAL MATCH (r)-[:PRODUCES]->(p:item)
-OPTIONAL MATCH (i)-[:FUEL_FOR]->(f:item)
-RETURN i, r, p, f LIMIT 20
+OPTIONAL MATCH recipePath = (i)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(p:item)
+OPTIONAL MATCH fuelPath = (i)-[:FUEL_FOR]-(f:item)
+RETURN recipePath, fuelPath LIMIT 20
 ```
-说明：返回木料作为原料的配方、产物，以及作为燃料的用途
+说明：返回木料作为原料的配方路径、产物路径，以及作为燃料的路径（注意：使用无向关系和路径返回）
 
 ## 重要提示
 
-1. **多返回相关节点**：除了直接答案，尽可能返回相关联的节点（配方的其他原料、中间节点等）
+1. **必须返回路径，不能返回孤立节点**：使用 `MATCH path = ... RETURN path` 的形式，永远不要只返回节点列表如 `RETURN node1, node2, node3`
 
-2. **使用OPTIONAL MATCH**：当某些关系可能存在也可能不存在时，使用OPTIONAL MATCH避免过滤掉部分结果
+2. **完全忽略关系方向**：所有关系查询必须使用无向关系 `-[:REL]-`，不要使用有向关系 `-[:REL]->` 或 `<-[:REL]-`。这样可以发现所有可能的连接。
 
-3. **合理设置LIMIT**：知识网查询可能返回大量数据，默认LIMIT 20-50
+3. **使用OPTIONAL MATCH**：当某些关系可能存在也可能不存在时，使用OPTIONAL MATCH避免过滤掉部分结果，但也要返回路径
 
-4. **关系链展示**：优先使用 MATCH (a)-[r1]->(b)-[r2]->(c) 的形式展示完整路径
+4. **合理设置LIMIT**：知识网查询可能返回大量数据，默认LIMIT 20-50
 
-5. **中文属性名匹配**：使用 `WHERE n.Name CONTAINS '关键词'` 进行模糊匹配
+5. **路径构建**：优先使用 `MATCH path = (a)-[:REL1]-(b)-[:REL2]-(c) RETURN path` 的形式返回完整路径
 
-6. **生物名称查询**：记住monster节点没有Name，需要通过item.Name和EggItemID关联
+6. **中文属性名匹配**：使用 `WHERE n.Name CONTAINS '关键词'` 进行模糊匹配
+
+7. **生物名称查询**：记住monster节点没有Name，需要通过item.Name和EggItemID关联
+
+8. **多路径返回**：如果查询涉及多个可选路径，可以返回多个路径变量，如 `RETURN path1, path2`
+
+9. **掉落物来源查询（关键）**：当用户查询"哪些东西可以掉落X"、"X从哪里获得"等关于掉落物来源的问题时：
+   - **必须优先考虑方块挖掘**：使用 OPTIONAL MATCH 同时查询 HAND_MINE_DROPS、TOOL_MINE_DROPS、PRECISE_DROP 三种方块挖掘关系
+   - **同时考虑生物掉落**：使用 OPTIONAL MATCH 查询 DROPS 关系
+   - **不能只查询生物掉落**：方块挖掘是物品的主要来源，忽略方块挖掘会导致查询结果不完整
+   - 示例模式：`OPTIONAL MATCH blockPath1 = (b:block)-[:HAND_MINE_DROPS]-(target:item) OPTIONAL MATCH blockPath2 = (b:block)-[:TOOL_MINE_DROPS]-(target) ...`
 
 ## 输出格式
 

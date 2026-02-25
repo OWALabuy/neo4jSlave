@@ -92,6 +92,12 @@
 \setlength{\cftbeforesubsecskip}{2pt}  % 小节间距
 \setlength{\cftbeforesubsubsecskip}{1pt}  % 小小节间距
 
+% 标题与正文间距（缩小 section/subsection 与段落的空隙）
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{1.5ex plus 0.3ex minus 0.2ex}{0.8ex plus 0.2ex}
+\titlespacing*{\subsection}{0pt}{1.2ex plus 0.3ex minus 0.2ex}{0.6ex plus 0.2ex}
+\titlespacing*{\subsubsection}{0pt}{1ex plus 0.3ex minus 0.2ex}{0.5ex plus 0.2ex}
+
 \begin{document}% 以下为正文内容
 % \maketitle% 产生标题 标题我另外弄了 这些被注释掉的内容会在论文完成后被移除
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
