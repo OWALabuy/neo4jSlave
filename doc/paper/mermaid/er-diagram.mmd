@@ -1,0 +1,75 @@
+erDiagram
+    %% 多标签架构说明
+    %% :item 作为基类
+    %% :item:block 和 :item:monster 作为子类（复合标签）
+    
+    ITEM[item|:item] {
+        int ID PK
+        string Name
+        int Type
+        string Disc
+        string GetWay
+    }
+    
+    BLOCK[item:block] {
+        int ID PK
+        int MineTool
+        int ToolLevel
+    }
+    
+    MONSTER[item:monster] {
+        int ID PK
+        int Life
+        int Attack
+    }
+    
+    GROUP[group|:group] {
+        int ID PK
+    }
+    
+    RECIPE[recipe|:recipe] {
+        int ID PK
+        int IsFollowMe
+        string StationLabel
+    }
+    
+    SMELT[smelt|:smelt] {
+        int ID PK
+        int Type
+    }
+    
+    DEVICE[device|:device] {
+        string type PK
+    }
+    
+    %% 继承关系（通过多标签实现）
+    ITEM ||--|| BLOCK : "继承为\n:item:block"
+    ITEM ||--|| MONSTER : "继承为\n:item:monster"
+    
+    %% 普通关系
+    ITEM }|--|| GROUP : "IN_GROUP"
+    
+    RECIPE }|--|{ ITEM : "CONSUMES\n(消耗材料)"
+    RECIPE }|--|{ BLOCK : "CONSUMES\n(消耗方块)"
+    RECIPE }|--|{ GROUP : "CONSUMES\n(消耗分组)"
+    
+    RECIPE ||--|{ ITEM : "PRODUCES\n(产出道具)"
+    RECIPE ||--|{ BLOCK : "PRODUCES\n(产出方块)"
+    
+    RECIPE ||--o{ ITEM : "CONTAIN\n(保留容器)"
+    
+    BLOCK }|--|{ ITEM : "HANDMINEDROPS\n(手挖掉落)"
+    BLOCK }|--|{ ITEM : "TOOLMINEDROPS\n(工具挖掉落)"
+    BLOCK ||--o| ITEM : "PreciseDrop\n(精准掉落)"
+    
+    MONSTER }|--|{ ITEM : "DROPS\n(击败掉落)"
+    
+    DEVICE ||--o| GROUP : "COVERS\n(覆盖分组)"
+    DEVICE ||--o| BLOCK : "COVERS\n(覆盖方块)"
+    
+    SMELT }|--|| DEVICE : "RUNS_ON\n(运行于)"
+    SMELT }|--|{ ITEM : "CONSUMES\n(熔炼消耗)"
+    SMELT ||--|{ ITEM : "PRODUCES\n(熔炼产出)"
+    
+    ITEM }|--|| DEVICE : "FUEL_FOR\n(燃料)"
+    ITEM }|--|| DEVICE : "OXYGEN_SOURCE\n(氧气原料)"
