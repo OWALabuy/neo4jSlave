@@ -633,30 +633,60 @@ Prompt中特别强调多标签查询语法：
     \item 查询纯道具：\texttt{MATCH (n:item) WHERE NOT n:block AND NOT n:monster}
 \end{itemize}
 
-\textbf{（4）知识网查询设计}
+\textbf{（4）路径查询设计（核心）}
 
-引导LLM生成返回完整关系路径的查询，而非单一节点：
-\begin{itemize}
-    \item 原料查询：返回原料$\rightarrow$配方$\rightarrow$产物的完整链
-    \item 配方查询：返回产物$\leftarrow$配方$\leftarrow$所有原料的完整网络
-    \item 生物查询：返回生物蛋$\rightarrow$生物$\rightarrow$掉落物的完整链
-\end{itemize}
+引导LLM生成返回\textbf{Path对象}的查询，而非孤立节点。这是前端正确渲染知识图谱的关键。
 
-\textbf{（5）Few-shot示例}
-
-提供7个典型查询示例，展示多标签架构下的知识网查询：
-\begin{lstlisting}[language=cypher, caption={方块查询示例}]
--- 深积岩用什么工具挖
-MATCH (n:item:block) WHERE n.Name CONTAINS '深积岩'
-OPTIONAL MATCH (n)-[:TOOLMINEDROPS]->(tool:item)
-RETURN n, tool
+❌ 错误示例（返回孤立节点）：
+\begin{lstlisting}[language=cypher]
+MATCH (r:recipe)-[:PRODUCES]->(p:item)
+MATCH (r)-[:CONSUMES]->(c:item)
+RETURN r, p, c  -- 只返回节点，前端无法显示关系
 \end{lstlisting}
 
-\begin{lstlisting}[language=cypher, caption={生物查询示例}]
+✅ 正确示例（返回路径对象）：
+\begin{lstlisting}[language=cypher]
+MATCH path = (material:item)<-[:CONSUMES]-(r:recipe)-[:PRODUCES]->(product:item)
+RETURN path  -- 返回Path对象，包含节点和关系
+\end{lstlisting}
+
+路径查询的优势：
+\begin{itemize}
+    \item 返回的Path对象包含完整的节点和关系信息
+    \item 前端ECharts可以直接解析Path中的关系进行渲染
+    \item 用户可以看到完整的知识网络，而非孤立的点
+\end{itemize}
+
+\textbf{（5）Few-shot示例（路径查询）}
+
+提供7个典型查询示例，展示路径查询语法：
+
+\begin{lstlisting}[language=cypher, caption={方块挖掘路径查询}]
+-- 深积岩用什么工具挖
+MATCH path = (n:item:block)-[:TOOLMINEDROPS]->(tool:item)
+WHERE n.Name CONTAINS '深积岩'
+RETURN path LIMIT 10
+\end{lstlisting}
+
+\begin{lstlisting}[language=cypher, caption={生物掉落路径查询}]
 -- 击败野人会掉落什么
-MATCH (n:item:monster) WHERE n.Name CONTAINS '野人'
-OPTIONAL MATCH (n)-[:DROPS]->(drop:item)
-RETURN n, drop
+MATCH path = (n:item:monster)-[:DROPS]->(drop:item)
+WHERE n.Name CONTAINS '野人'
+RETURN path LIMIT 20
+\end{lstlisting}
+
+\begin{lstlisting}[language=cypher, caption={合成配方路径查询}]
+-- 木料能合成什么
+MATCH path = (material:item)<-[:CONSUMES]-(r:recipe)-[:PRODUCES]->(product:item)
+WHERE material.Name CONTAINS '木料'
+RETURN path LIMIT 20
+\end{lstlisting}
+
+\begin{lstlisting}[language=cypher, caption={配方原料路径查询}]
+-- 木剑的合成配方
+MATCH path = (product:item)<-[:PRODUCES]-(r:recipe)-[:CONSUMES]->(material:item)
+WHERE product.Name CONTAINS '剑'
+RETURN path LIMIT 20
 \end{lstlisting}
 
 \textbf{（6）输出格式要求}
@@ -665,7 +695,11 @@ RETURN n, drop
 
 \subsubsection{Prompt优化策略}
 
-\textbf{（1）多标签架构优势}
+\textbf{（1）路径查询优先}
+
+强制使用 \texttt{MATCH path = ()-[]-() RETURN path} 语法，确保返回的查询结果可以被前端正确渲染为知识图谱。测试表明，路径查询相比孤立节点查询，可视化效果提升显著。
+
+\textbf{（2）多标签架构优势}
 
 利用Neo4j多标签特性，方块和生物节点同时具有:item标签和专属标签（:block或:monster）。这使得：
 \begin{itemize}
@@ -674,11 +708,11 @@ RETURN n, drop
     \item 查询语义更清晰，符合领域模型（方块是一种道具）
 \end{itemize}
 
-\textbf{（2）中文模糊匹配}
+\textbf{（3）中文模糊匹配}
 
 由于迷你世界道具名称具有复合命名特点（如"黄铜斧+石剑"），Prompt中强调使用\texttt{Name CONTAINS}进行模糊匹配。
 
-\textbf{（3）参数化查询}
+\textbf{（4）参数化查询}
 
 强制使用参数占位符（\texttt{\$param}）代替直接值，防止Cypher注入攻击。
 
