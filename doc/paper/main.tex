@@ -479,6 +479,17 @@ Neo4j支持为一个节点设置多个标签（Multiple Labels），本系统利
     \item \textbf{性能优化}：避免了额外的JOIN操作，查询效率更高
 \end{enumerate}
 
+\subsubsection{E-R图}
+
+图~\ref{fig:er-diagram}展示了知识图谱的实体-关系模型。图中使用复合标签表示继承关系，如`:item:block`表示方块继承道具的所有属性，并添加方块专属属性。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{img/er-diagram.png}
+    \caption{知识图谱E-R图}
+    \label{fig:er-diagram}
+\end{figure}
+
 \subsubsection{节点类型}
 
 \begin{table}[H]

@@ -6,25 +6,22 @@
 
 用户的自然语言问题应该被转换为能够返回**完整路径**的Cypher查询，使用 `MATCH path = ()-[]-()` 语法，这样Neo4j会返回包含节点和关系的Path对象，前端才能正确渲染成知识图谱。
 
-❌ 错误示例（返回孤立节点，无法显示关系）：
+**无方向关系查询（重点）**
+
+为了尽可能匹配所有结果，使用无方向关系 `-[]-` 而不是有方向 `-[]->` 或 `<-[]-`：
+
+✅ 正确示例（无方向，匹配所有）：
 ```cypher
-MATCH (r:recipe)-[:PRODUCES]->(p:item) WHERE p.Name CONTAINS '木剑'
-MATCH (r)-[:CONSUMES]->(c:item)
-RETURN r, p, c  -- 只返回节点，没有路径信息
+MATCH path = (r:recipe)-[:CONSUMES]-(m:item)
+WHERE m.Name CONTAINS '木料'
+RETURN path
 ```
 
-✅ 正确示例（返回路径，包含节点和关系）：
+❌ 不推荐（有方向，可能遗漏）：
 ```cypher
-MATCH path = (r:recipe)-[:PRODUCES]->(p:item) WHERE p.Name CONTAINS '木剑'
-MATCH path2 = (r)-[:CONSUMES]->(c:item)
-RETURN path, path2  -- 返回路径对象，包含关系信息
-```
-
-或者使用更简洁的路径查询：
-```cypher
-MATCH path = (material:item)<-[:CONSUMES]-(r:recipe)-[:PRODUCES]->(product:item)
-WHERE material.Name CONTAINS '木料'
-RETURN path LIMIT 20
+MATCH path = (r:recipe)-[:CONSUMES]->(m:item)
+WHERE m.Name CONTAINS '木料'
+RETURN path
 ```
 
 ## 知识图谱 Schema（多标签架构）
@@ -43,48 +40,44 @@ RETURN path LIMIT 20
 - **:device** - 设备抽象（熔炉/篝火/氧气装置），属性: type
 
 ### 关系类型 (Relationship Types)
-- **IN_GROUP** - (item)-[:IN_GROUP]->(group)
-- **CONSUMES** - (recipe)-[:CONSUMES]->(item|block|group)
-- **PRODUCES** - (recipe)-[:PRODUCES]->(item|block)
-- **CONTAIN** - (recipe)-[:CONTAIN]->(item) - 合成保留容器
-- **HANDMINEDROPS** - (:item:block)-[:HANDMINEDROPS]->(:item)
-- **TOOLMINEDROPS** - (:item:block)-[:TOOLMINEDROPS]->(:item)
-- **PreciseDrop** - (:item:block)-[:PreciseDrop]->(:item)
-- **DROPS** - (:item:monster)-[:DROPS]->(:item)
-- **COVERS** - (:device)-[:COVERS]->(group|item:block)
-- **RUNS_ON** - (:smelt)-[:RUNS_ON]->(:device)
-- **FUEL_FOR** - (item)-[:FUEL_FOR]->(:device)
-- **OXYGEN_SOURCE** - (item)-[:OXYGEN_SOURCE]->(:device)
+
+所有关系都使用无方向查询以最大化匹配：
+- **IN_GROUP** - (item)-[:IN_GROUP]-(group)
+- **CONSUMES** - (recipe)-[:CONSUMES]-(item|block|group)
+- **PRODUCES** - (recipe)-[:PRODUCES]-(item|block)
+- **CONTAIN** - (recipe)-[:CONTAIN]-(item)
+- **HANDMINEDROPS** - (:item:block)-[:HANDMINEDROPS]-(:item)
+- **TOOLMINEDROPS** - (:item:block)-[:TOOLMINEDROPS]-(:item)
+- **PreciseDrop** - (:item:block)-[:PreciseDrop]-(:item)
+- **DROPS** - (:item:monster)-[:DROPS]-(:item)
+- **COVERS** - (:device)-[:COVERS]-(group|item:block)
+- **RUNS_ON** - (:smelt)-[:RUNS_ON]-(:device)
+- **FUEL_FOR** - (item)-[:FUEL_FOR]-(:device)
+- **OXYGEN_SOURCE** - (item)-[:OXYGEN_SOURCE]-(:device)
 
 ## 路径查询语法（重点）
 
-**使用 MATCH path = (a)-[r]->(b) RETURN path 返回完整路径：**
+**使用 MATCH path = (a)-[r]-(b) RETURN path 返回完整路径：**
 
 ```cypher
--- 返回包含节点和关系的Path对象
-MATCH path = (n:item:block)-[:TOOLMINEDROPS]->(tool:item)
+-- 无方向关系，匹配所有
+MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(tool:item)
 WHERE n.Name CONTAINS '深积岩'
-RETURN path
+RETURN path LIMIT 10
 ```
 
 **多段路径查询：**
 ```cypher
--- 返回多条路径，前端会合并渲染
-MATCH path1 = (m:item)<-[:CONSUMES]-(r:recipe)
-MATCH path2 = (r)-[:PRODUCES]->(p:item)
+-- 多个无方向路径
+MATCH path1 = (m:item)-[:CONSUMES]-(r:recipe)
+MATCH path2 = (r)-[:PRODUCES]-(p:item)
 WHERE m.Name CONTAINS '木料'
-RETURN path1, path2
+RETURN path1, path2 LIMIT 20
 ```
 
-**可变长度路径（可选）：**
-```cypher
--- 查找多跳关系
-MATCH path = (a:item)-[:CONSUMES|PRODUCES*1..3]-(b:item)
-WHERE a.Name CONTAINS '木料'
-RETURN path LIMIT 20
-```
+**注意**：虽然关系在Neo4j中是有方向的，但在查询时使用 `-[]-` 可以匹配两个方向的连接，这在探索性查询中非常有用。
 
-## Few-shot 示例（路径查询）
+## Few-shot 示例（无方向路径查询）
 
 ### 示例1: 道具查找（简单节点）
 用户: "查找石剑"
@@ -95,71 +88,68 @@ AND NOT n:block AND NOT n:monster
 RETURN n LIMIT 10
 ```
 
-### 示例2: 方块挖掘路径（路径查询）
+### 示例2: 方块挖掘路径（无方向）
 用户: "深积岩用什么工具挖"
 CQL:
 ```cypher
-MATCH path = (n:item:block)-[:TOOLMINEDROPS]->(tool:item)
+MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(tool:item)
 WHERE n.Name CONTAINS '深积岩'
 RETURN path LIMIT 10
 ```
 
-### 示例3: 生物掉落路径（路径查询）
+### 示例3: 生物掉落路径（无方向）
 用户: "击败野人会掉落什么"
 CQL:
 ```cypher
-MATCH path = (n:item:monster)-[:DROPS]->(drop:item)
+MATCH path = (n:item:monster)-[:DROPS]-(drop:item)
 WHERE n.Name CONTAINS '野人'
 RETURN path LIMIT 20
 ```
 
-### 示例4: 合成配方网络（路径查询 - 重点）
+### 示例4: 合成配方网络（无方向 - 重点）
 用户: "木料能合成什么"
 CQL:
 ```cypher
-MATCH path = (material:item)<-[:CONSUMES]-(r:recipe)-[:PRODUCES]->(product:item)
+MATCH path = (material:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(product:item)
 WHERE material.Name CONTAINS '木料'
 RETURN path LIMIT 20
 ```
-说明：返回 原料<-[CONSUMES]-配方-[PRODUCES]->产物 的完整路径
+说明：返回 原料-[CONSUMES]-配方-[PRODUCES]-产物 的完整网络（无方向匹配）
 
-### 示例5: 配方的完整原料网络（路径查询 - 重点）
+### 示例5: 配方的完整原料网络（无方向 - 重点）
 用户: "木剑的合成配方"
 CQL:
 ```cypher
-MATCH path = (product:item)<-[:PRODUCES]-(r:recipe)-[:CONSUMES]->(material:item)
+MATCH path = (product:item)-[:PRODUCES]-(r:recipe)-[:CONSUMES]-(material:item)
 WHERE product.Name CONTAINS '剑'
 RETURN path LIMIT 20
 ```
-说明：返回 产物<-[PRODUCES]-配方-[CONSUMES]->原料 的完整网络
+说明：返回 产物-[PRODUCES]-配方-[CONSUMES]-原料 的完整网络（无方向匹配）
 
-### 示例6: 反向查找（路径查询）
+### 示例6: 反向查找（无方向）
 用户: "什么方块能挖出铁矿"
 CQL:
 ```cypher
-MATCH path = (n:item:block)-[:TOOLMINEDROPS]->(drop:item)
+MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(drop:item)
 WHERE drop.Name CONTAINS '铁矿'
 RETURN path LIMIT 10
 ```
 
-### 示例7: 多关系路径（路径查询）
+### 示例7: 多关系路径（无方向）
 用户: "木料有什么用"
 CQL:
 ```cypher
-MATCH path1 = (i:item)<-[:CONSUMES]-(r:recipe)
-MATCH path2 = (r)-[:PRODUCES]->(p:item)
+MATCH path1 = (i:item)-[:CONSUMES]-(r:recipe)
+MATCH path2 = (r)-[:PRODUCES]-(p:item)
 WHERE i.Name CONTAINS '木料'
 RETURN path1, path2 LIMIT 20
 ```
 
 ## 重要提示
 
-1. **路径查询优先**：使用 `MATCH path = (a)-[r]->(b) RETURN path` 而不是 `RETURN a, b`
+1. **路径查询优先**：使用 `MATCH path = (a)-[r]-(b) RETURN path` 而不是 `RETURN a, b`
 
-2. **关系方向灵活**：
-   - (a)-[:PRODUCES]->(b) : a产出b
-   - (a)<-[:CONSUMES]-(b) : b消耗a（等同于 b-[:CONSUMES]->a）
-   - 使用双向箭头时考虑语义：`<-[:X]-` 等价于 `-[:X]->`
+2. **无方向关系**：使用 `-[:TYPE]-` 而不是 `-[:TYPE]->` 或 `<-[:TYPE]-`，这样可以匹配任意方向的关系，最大化查询结果
 
 3. **多标签查询**：
    - 方块：`:item:block`
@@ -174,8 +164,8 @@ RETURN path1, path2 LIMIT 20
 
 返回 JSON 格式:
 {
-  "cql": "MATCH path = (n:item:block)-[:TOOLMINEDROPS]->(tool:item) WHERE n.Name CONTAINS $name RETURN path LIMIT 10",
+  "cql": "MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(tool:item) WHERE n.Name CONTAINS $name RETURN path LIMIT 10",
   "params": {"name": "深积岩"}
 }
 
-记住：**MATCH path = ... RETURN path** 是生成可渲染知识图谱的关键！
+记住：**MATCH path = ... RETURN path** + **无方向关系 -[]-** 是生成可渲染知识图谱的关键！

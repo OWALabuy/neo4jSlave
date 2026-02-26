@@ -10,13 +10,13 @@ erDiagram
         string GetWay
     }
     
-    BLOCK_EXT {
+    BLOCK {
         int ID PK
         int MineTool
         int ToolLevel
     }
     
-    MONSTER_EXT {
+    MONSTER {
         int ID PK
         int Life
         int Attack
@@ -42,34 +42,34 @@ erDiagram
     }
     
     %% 多标签说明：方块节点同时具有 :item 和 :block 标签
-    ITEM ||--|| BLOCK_EXT : "继承为复合标签\n:item:block"
+    ITEM ||--|| BLOCK : "继承为复合标签\n:item:block"
     
     %% 多标签说明：生物节点同时具有 :item 和 :monster 标签
-    ITEM ||--|| MONSTER_EXT : "继承为复合标签\n:item:monster"
+    ITEM ||--|| MONSTER : "继承为复合标签\n:item:monster"
     
     %% 普通关系
     ITEM }|--|| GROUP : "IN_GROUP"
     
     RECIPE }|--|{ ITEM : "CONSUMES"
-    RECIPE }|--|{ BLOCK_EXT : "CONSUMES"
+    RECIPE }|--|{ BLOCK : "CONSUMES"
     RECIPE }|--|{ GROUP : "CONSUMES"
     
     RECIPE ||--|{ ITEM : "PRODUCES"
-    RECIPE ||--|{ BLOCK_EXT : "PRODUCES"
+    RECIPE ||--|{ BLOCK : "PRODUCES"
     
     RECIPE ||--o{ ITEM : "CONTAIN"
     
     %% 方块相关关系（:item:block 节点）
-    BLOCK_EXT }|--|{ ITEM : "HANDMINEDROPS"
-    BLOCK_EXT }|--|{ ITEM : "TOOLMINEDROPS"
-    BLOCK_EXT ||--o| ITEM : "PreciseDrop"
+    BLOCK }|--|{ ITEM : "HANDMINEDROPS"
+    BLOCK }|--|{ ITEM : "TOOLMINEDROPS"
+    BLOCK ||--o| ITEM : "PreciseDrop"
     
     %% 生物相关关系（:item:monster 节点）
-    MONSTER_EXT }|--|{ ITEM : "DROPS"
+    MONSTER }|--|{ ITEM : "DROPS"
     
     %% 设备相关关系
     DEVICE ||--o| GROUP : "COVERS"
-    DEVICE ||--o| BLOCK_EXT : "COVERS"
+    DEVICE ||--o| BLOCK : "COVERS"
     
     SMELT }|--|| DEVICE : "RUNS_ON"
     SMELT }|--|{ ITEM : "CONSUMES"
