@@ -64,14 +64,15 @@
       .chip:hover { filter: brightness(1.05); }
 
       .main { display: grid; grid-template-columns: 420px 1fr; gap: 8px; padding: 8px; height: calc(100vh - 120px); box-sizing: border-box; }
-      @media (max-width: 920px) { .main { grid-template-columns: 1fr; height: auto; } #chart { height: 420px; } }
-      .left { display: flex; flex-direction: column; gap: 8px; }
-      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; overflow: auto; height: 100%; box-shadow: 0 1px 0 rgba(17,24,39,.03); }
+      .main > * { min-height: 0; }
+      @media (max-width: 920px) { .main { grid-template-columns: 1fr; height: auto; } .main > * { min-height: unset; } #chart { height: 420px; } }
+      .left { display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: hidden; }
+      .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; overflow: auto; min-height: 0; flex-shrink: 0; box-shadow: 0 1px 0 rgba(17,24,39,.03); }
       .panel pre { white-space: pre-wrap; word-break: break-word; color: var(--muted); }
       .panel strong { color: var(--text); }
       textarea { width: 100%; height: calc(100% - 24px); resize: vertical; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
       textarea:focus-visible, .toolbar input:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-      #chart { width: 100%; height: 100%; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+      #chart { width: 100%; height: 100%; min-height: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   </head>
@@ -184,6 +185,7 @@
             emphasis: { focus: 'adjacency', lineStyle: { width: 2 } }
           }]
         });
+        chart.resize();
       }
 
       function setLoading(loading) {
