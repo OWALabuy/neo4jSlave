@@ -28,7 +28,16 @@
           --chip-text: #b7c6ff;
         }
       }
-      body.dark {
+      body.theme-light {
+        --bg: #f7f8fa;
+        --text: #111;
+        --muted: #656f7b;
+        --panel: #ffffff;
+        --border: #e5e7eb;
+        --chip-bg: #eef4ff;
+        --chip-text: #1f4b99;
+      }
+      body.theme-dark {
         --bg: #0b0f17;
         --text: #e6e6e6;
         --muted: #9aa4b2;
@@ -435,9 +444,11 @@
 
       function applyTheme(theme) {
         const isDark = theme === 'dark';
-        document.body.classList.toggle('dark', isDark);
+        document.body.classList.remove('theme-light', 'theme-dark');
+        document.body.classList.add(isDark ? 'theme-dark' : 'theme-light');
         btnTheme.setAttribute('aria-pressed', String(isDark));
         btnTheme.textContent = isDark ? '☀️' : '🌙';
+        btnTheme.title = isDark ? '切换到日间模式' : '切换到夜间模式';
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
         updateChartTheme();
       }
@@ -450,8 +461,8 @@
       }
 
       btnTheme.addEventListener('click', () => {
-        const next = document.body.classList.contains('dark') ? 'light' : 'dark';
-        applyTheme(next);
+        const isDark = document.body.classList.contains('theme-dark');
+        applyTheme(isDark ? 'light' : 'dark');
       });
 
       document.getElementById('btn-nlq').addEventListener('click', callNlq);
