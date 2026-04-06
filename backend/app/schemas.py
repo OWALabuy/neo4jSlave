@@ -5,7 +5,6 @@ from pydantic import BaseModel
 class NLQOptions(BaseModel):
     limit: Optional[int] = None
     debug_raw: Optional[bool] = False
-    debug_raw: Optional[bool] = False
 
 
 class NLQRequest(BaseModel):
@@ -16,7 +15,6 @@ class NLQRequest(BaseModel):
 class RunCQLRequest(BaseModel):
     cql: str
     params: Optional[Dict[str, Any]] = None
-    raw: Optional[bool] = False
     raw: Optional[bool] = False
 
 
@@ -36,5 +34,3 @@ class NLQResponse(BaseModel):
     raw: Optional[List[Dict[str, Any]]] = None
     keys: Optional[List[str]] = None
     table: Optional[Dict[str, Any]] = None
-    raw: Optional[List[Dict[str, Any]]] = None
-    keys: Optional[List[str]] = None

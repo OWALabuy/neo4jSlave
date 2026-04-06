@@ -5,22 +5,22 @@
 以下为「项目 + 论文」一并收敛到可答辩状态的推荐顺序；**已完成**项在对应小节勾掉即可。
 
 ### A. 数据与表述可核对（专项行动）
-1. [ ] 连接真实 Neo4j，运行 `python3 scripts/neo4j_paper_stats.py`，核对 `sum_typed_rows` 与 `total_nodes_all_labels`；若不等，在论文「数据规模」节补充说明（例如存在未列入表的标签）。
-2. [ ] 用脚本输出更新 `main.tex` 表 4-2 的数量与占比列，并复核关系总数 `total_relationships`。
-3. [ ] 固定 NLQ 人工评测：**模型名、API、温度、21 条问句原文、通过判定标准**（可另存 `doc/paper/nlq_eval_cases.md` 或附件），保证与表 5-1 可一一对照。
+1. [x] 连接真实 Neo4j，运行 `scripts/neo4j_paper_stats.py`，核对 `sum_typed_rows` 与 `total_nodes_all_labels`（当前库二者均为 7766）。
+2. [x] 用脚本输出更新论文「数据规模」表及关系 12,240（有向计数）。
+3. [ ] 在 `doc/paper/nlq_eval_protocol.md` **补全 21 条问句原文与逐条结果**，与表 5-1 完全一致（模板已就绪）。
 
 ### B. 论文内容（LaTeX）
 1. [x] 摘要/英文摘要与 NLQ 实测通过率一致，区分 pytest 与人工评测。
 2. [x] 数据规模表行求和与「节点总计」一致；注明以脚本为准。
 3. [x] 结论中复杂查询短板引用表 5-1 类别，避免误用「38.1\%」指复杂查询。
 4. [x] 安全机制与实现对齐：黑名单全文、`ENABLE_EXPLAIN_VALIDATE` 默认关闭、超时环境变量。
-5. [ ] 通读全文，将剩余「CQL」统一为「Cypher」叙述（API 路径 `run-cql`、字段名 `cql`、模块名 `cql_validator` 可保留英文）。
-6. [ ] 核对参考文献：会议页码、arXiv 编号、网页检索日期；删除或替换无法核实的条目。
+5. [x] 正文叙述已统一为 Cypher；测试小节改为「只读校验器」表述，并保留 API/模块历史命名说明。
+6. [x] 参考文献 [2] 已改为 SAIS Article~24 + 稳定 URL；[5][9] 著录已收紧（仍建议终稿前按学院格式细则统一标点）。
 7. [ ] 按学院 Word/LaTeX 规范终检：图表题、目录、参考文献体例。
 
 ### C. 代码与工程
 1. [x] README 说明：数据脚本、NLQ 评测与 pytest 边界。
-2. [ ] 提交前 `python -m pytest tests/ -q` 全绿；按需补充 `DROP ...` 等黑名单的边界用例。
+2. [x] `pytest tests/ -q`：38 passed（建议在 `~/pyenv` 激活后运行）。
 3. [ ] （可选）生产部署：收紧 CORS、只读库账号、开启 EXPLAIN 或 WAF 等——若写进论文需如实描述部署形态。
 
 ### D. 素材
