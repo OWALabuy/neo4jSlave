@@ -96,9 +96,9 @@ QUERY_HARD_LIMIT=200
 - 使用 ECharts 渲染 `graph`，支持展示 LLM 生成的 Cypher 与手动 Cypher 模式
 
 ### 论文与数据口径（重要）
-- **节点/关系规模**：`doc/paper/main.tex` 中「知识图谱数据规模」表应与真实库一致。配置好 `.env` 后运行：
+- **节点/关系规模**：`doc/paper/main.tex` 中「知识图谱数据规模」表应与真实库一致。配置好 `.env` 后，在已安装项目依赖的虚拟环境中运行（示例：`source ~/pyenv/bin/activate`）：
   ```bash
-  python3 scripts/neo4j_paper_stats.py
+  python scripts/neo4j_paper_stats.py
   ```
   将输出的计数与「互斥分类之和」「全库节点总数」核对后再改论文；若存在仅带其它标签的节点，二者可能不等，应在文中说明统计口径。
 - **自然语言准确率**：pytest 中 `/nlq` 用例 **Mock 了 LLM**，通过只说明链路正确，**不**代表真实 NL 准确率。人工 21 条评测需在固定模型版本与判定标准下单独记录（可附问句清单与判定规则）。
