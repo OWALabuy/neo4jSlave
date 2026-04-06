@@ -19,7 +19,7 @@
 
     本文设计并实现了一个基于自然语言的知识图谱查询与可视化系统（neo4jSlave），该系统采用B/S架构，通过FastAPI构建后端服务，结合大语言模型实现自然语言到Cypher查询语句的转换，并利用ECharts进行查询结果的可视化展示。系统具有只读安全限制、参数化查询、以及通过环境变量切换Neo4j与LLM端点等特性，降低了知识图谱的使用门槛。
 
-    实验结果表明，系统在pytest自动化测试（38项）中全部通过；在人工设计的21条自然语言用例评测中，整体通过率约为57.1\%，其中方块、生物类查询表现较好，复杂多跳查询仍有明显提升空间。系统能够将多数常见问句转为可执行Cypher并以图谱形式展示，具有一定的实用价值。
+    实验结果表明，系统在pytest自动化测试（38项）中全部通过；在人工设计的21条自然语言用例评测中（2026年4月6日实测，问句与判定记录见\texttt{nlq\_eval\_protocol.md}），整体通过率约为81.0\%（17/21）；道具、合成、掉落、生物类问句表现突出，方块「掉落」与分组、多实体对比类仍存在失误。系统能够将多数常见问句转为可执行Cypher并以图谱或表格/JSON形式展示，具有一定的实用价值。
 \end{abstract}
 
 \begin{thesiskeywords}
@@ -35,7 +35,7 @@ Knowledge graphs, as semantic networks, can describe entities and their relation
 
 This paper designs and implements a natural language-based knowledge graph query and visualization system (neo4jSlave). The system adopts B/S architecture, builds backend services with FastAPI, uses large language models to convert natural language to Cypher queries, and utilizes ECharts for visualization of query results. The system features read-only security restrictions, parameterized queries, and configurable Neo4j/LLM endpoints via environment variables, lowering the barrier to using knowledge graphs.
 
-Automated pytest tests (38 cases) all pass. On a manually curated set of 21 natural-language questions, the end-to-end success rate is about 57.1\%, with stronger performance on block- and creature-related queries and weaker performance on complex multi-hop questions. The system demonstrates practical value for common exploration tasks over a domain knowledge graph.
+Automated pytest tests (38 cases) all pass. On 21 manually executed natural-language questions (recorded on 2026-04-06 in \texttt{nlq\_eval\_protocol.md}), the end-to-end success rate is about 81.0\% (17/21), with strong results on item, crafting, drop, and creature queries, while block-drop phrasing, group ID semantics, and multi-entity comparisons remain error-prone.
 \end{thesisabstracten}
 \thesiskeywordsen{Knowledge Graph; Natural Language Processing; Cypher Query; Neo4j; Large Language Model; Data Visualization; FastAPI}
 
@@ -700,32 +700,32 @@ WRITE_BLACKLIST = [
         \toprule
         \textbf{查询类别} & \textbf{测试数} & \textbf{通过数} & \textbf{准确率} \\
         \midrule
-        道具查找 & 4 & 3 & 75.0\% \\
-        合成查询 & 3 & 1 & 33.3\% \\
-        掉落查询 & 3 & 2 & 66.7\% \\
-        方块查询 & 3 & 3 & 100\% \\
+        道具查找 & 4 & 4 & 100\% \\
+        合成查询 & 3 & 3 & 100\% \\
+        掉落查询 & 3 & 3 & 100\% \\
+        方块查询 & 3 & 2 & 66.7\% \\
         生物查询 & 2 & 2 & 100\% \\
-        关系查询 & 2 & 0 & 0.0\% \\
-        复杂查询 & 2 & 0 & 0.0\% \\
+        关系查询 & 2 & 1 & 50.0\% \\
+        复杂查询 & 2 & 1 & 50.0\% \\
         边缘情况 & 2 & 1 & 50.0\% \\
         \midrule
-        \textbf{总计} & \textbf{21} & \textbf{12} & \textbf{57.1\%} \\
+        \textbf{总计} & \textbf{21} & \textbf{17} & \textbf{81.0\%} \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-\textbf{注：}上表为某一固定模型与问句集合下的统计；若按 \texttt{doc/paper/nlq\_eval\_protocol.md} 中现版模板（含「生物查询」等）重新实测，应整表替换为\textbf{新}通过数与准确率，并保持问句清单可复查。
+\textbf{注：}上表为\textbf{2026年4月6日}按 \texttt{doc/paper/nlq\_eval\_protocol.md} 中问句实测汇总；若更换模型或问句，应重新统计并替换本表。
 
 \textbf{多标签架构效果分析：}
 
 \begin{enumerate}[(1)]
-    \item \textbf{方块查询准确率100\%}：采用多标签架构后，可直接使用\texttt{:item:block}查询，无需再经旧版 PLACE 类桥接关系，大幅提升了准确率。
+    \item \textbf{道具、合成、掉落、生物类整体表现好}：本轮回测中上述四类共12条均通过，说明多标签 Schema 与路径型 Prompt 对常见探索问句较友好。
     
-    \item \textbf{生物查询准确率100\%}：表~\ref{tab:nlq-category}中「生物查询」类用例全部通过；该类覆盖\texttt{:item:monster}及 DROPS 等路径，相较旧版 SUMMON 桥接节点，复合标签使意图与 Cypher 模式更一致（具体演进见「架构演进」小节）。
+    \item \textbf{方块类需区分问法}：「用什么工具挖」类可通过 \texttt{TOOLMINEDROPS} 路径在 JSON 中呈现工具信息；但「方块有哪些掉落」易被模型误走挖掘边而未展开掉落子图，需在 Prompt 或后处理中区分\textbf{挖掘工具}与\textbf{方块掉落物}两类关系。
     
-    \item \textbf{道具查找准确率75\%}：简单节点查询效果良好，LLM能够正确理解中文名称并生成CONTAINS匹配语句。
+    \item \textbf{分组与业务键}：\texttt{:group} 的 \texttt{ID} 多为数值型主键，用户以中文分组名发问时，模型若直接 \texttt{WHERE group.ID = '冶炼台'} 会失败，宜引导先定位代表物品再 \texttt{IN\_GROUP}。
     
-    \item \textbf{复杂查询待改进}：涉及多关系联合的查询（如"所有可以合成的武器"）准确率仍较低，这是未来优化的重点方向。
+    \item \textbf{复杂与边缘问句}：多跳合成（如颜料瓶原料）可成功；依赖 \texttt{StationLabel} 与真实存储键不一致（名称 vs ID）或双实体对比时，仍易生成不合法或过于严格的 \texttt{Name = \$param} 而失败，是后续 Prompt 与 Schema 说明的重点优化方向。
 \end{enumerate}
 
 \textbf{新旧架构对比：}
@@ -738,15 +738,15 @@ WRITE_BLACKLIST = [
         \toprule
         \textbf{查询类型} & \textbf{旧架构准确率} & \textbf{新架构准确率} \\
         \midrule
-        方块查询 & 0\% & 100\% \\
+        方块查询 & 0\% & 66.7\% \\
         生物查询 & 50\% & 100\% \\
-        道具查找 & 75\% & 75\% \\
-        总体平均 & 38.1\% & 57.1\% \\
+        道具查找 & 75\% & 100\% \\
+        总体平均 & 38.1\% & 81.0\% \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-测试结果表明，多标签架构显著提升了方块和生物相关查询的准确率，验证了架构设计的有效性。
+测试结果表明，多标签架构在道具、生物与配方链路上显著优于旧版桥接方案；方块与分组类问句仍受自然语言歧义与属性键语义影响，需结合 Prompt 持续细化。
 
 典型测试用例如表~\ref{tab:nlq-cases}所示。
 
@@ -837,7 +837,7 @@ WRITE_BLACKLIST = [
 
 \textbf{（2）自然语言查询模块}
 
-设计并实现了基于大语言模型的自然语言到Cypher查询转换模块。通过精心设计的Prompt模板，包含角色定义、Schema描述、Few-shot示例和输出格式要求，引导LLM生成可执行的只读Cypher。人工评测（21条）总体通过率约57.1\%，其中「道具查找」类约75\%；复杂多关系问句仍为短板。
+设计并实现了基于大语言模型的自然语言到Cypher查询转换模块。通过精心设计的Prompt模板，包含角色定义、Schema描述、Few-shot示例和输出格式要求，引导LLM生成可执行的只读Cypher。人工评测（21条，2026年4月6日）总体通过率约81.0\%；道具、合成、掉落、生物类问句表现较好，分组键、StationLabel 与多实体对比类仍为短板。
 
 \textbf{（3）安全校验机制}
 
@@ -865,7 +865,7 @@ WRITE_BLACKLIST = [
 
 当前系统存在以下不足：
 \begin{enumerate}[(1)]
-    \item 复杂查询（涉及多关系联合）在人工评测中通过率偏低（表~\ref{tab:nlq-category}中「复杂查询」类为0\%；整体NLQ平均约57.1\%，低于理想水平）
+    \item 复杂查询与分组、多实体对比在人工评测中仍有失误（表~\ref{tab:nlq-category}中「复杂查询」「关系查询」「边缘情况」等类为50.0\%；整体NLQ约81.0\%，距离稳健生产应用仍有差距）
     \item 缺乏同义词处理能力，用户对同一概念的不同表述无法正确识别
     \item 未实现用户认证和查询历史记录功能
 \end{enumerate}
