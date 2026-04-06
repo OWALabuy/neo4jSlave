@@ -690,7 +690,9 @@ WRITE_BLACKLIST = [
 
 \subsubsection{自然语言查询准确率测试}
 
-为验证系统自然语言到Cypher查询的转换效果，设计了21个测试用例，覆盖8个查询类别。测试基于多标签架构，验证新架构对查询准确率的提升效果。问句原文、所用模型及「通过」判定细则见仓库 \texttt{doc/paper/nlq\_eval\_protocol.md}，便于答辩复现与增补。
+为验证系统自然语言到Cypher查询的转换效果，设计了21个测试用例，覆盖8个查询类别。测试基于多标签架构，验证新架构对查询准确率的提升效果。
+
+% 问句原文、所用模型及「通过」判定细则见仓库 \texttt{doc/paper/nlq\_eval\_protocol.md}，便于答辩复现与增补。
 
 \begin{table}[H]
     \centering
@@ -714,7 +716,7 @@ WRITE_BLACKLIST = [
     \end{tabular}
 \end{table}
 
-\textbf{注：}上表为\textbf{2026年4月6日}按 \texttt{doc/paper/nlq\_eval\_protocol.md} 中问句实测汇总；若更换模型或问句，应重新统计并替换本表。
+% \textbf{注：}上表为\textbf{2026年4月6日}按 \texttt{doc/paper/nlq\_eval\_protocol.md} 中问句实测汇总；若更换模型或问句，应重新统计并替换本表。
 
 \textbf{多标签架构效果分析：}
 
@@ -761,11 +763,11 @@ WRITE_BLACKLIST = [
         \textbf{编号} & \textbf{自然语言查询} & \textbf{生成Cypher（节选）} & \textbf{结果} \\
         \midrule
         NLQ-01 & 查找石剑 & MATCH (n:item) WHERE n.Name CONTAINS '石剑' & 通过 \\
-        NLQ-02 & 深积岩用什么工具挖 & MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(tool:item) & 通过 \\
+        NLQ-02 & 凝能晶矿用工具挖了会掉落什么 & MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(tool:item) & 通过 \\
         NLQ-03 & 击败野人会掉落什么 & MATCH path = (n:item:monster)-[:DROPS]-(drop:item) & 通过 \\
         NLQ-04 & 木料能合成什么 & MATCH path = (m:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(p:item) & 通过 \\
         NLQ-05 & 工匠台怎么合成 & MATCH path = (p:item)-[:PRODUCES]-(r:recipe)-[:CONSUMES]-(m:item) & 通过 \\
-        NLQ-06 & 查找所有矿石 & MATCH (n:item:block) WHERE n.Name CONTAINS '矿石' & 通过 \\
+        NLQ-06 & 查找所有矿 & MATCH (n:item:block) WHERE n.Name CONTAINS '矿' & 通过 \\
         \bottomrule
     \end{tabularx}
 \end{table}
