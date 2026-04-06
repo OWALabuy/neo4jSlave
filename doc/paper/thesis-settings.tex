@@ -1,0 +1,247 @@
+% =============================================================================
+% 论文版式集中配置（对照 ../毕业论文格式规范-计算机与信息技术学院.md）
+% 正文尽量只写内容与结构，字体字号与页眉页脚等均在本文声明。
+% =============================================================================
+
+% ----- 论文元数据（修改封面与个人信息时只改这里） -----
+\newcommand{\thesistitleline}{本科生毕业（设计）论文}
+\newcommand{\thesissubtitle}{基于自然语言的知识图谱查询与可视化系统研究与实现}
+\newcommand{\thesisauthor}{欧阳闻奕}
+\newcommand{\thesisstudentid}{2022102069}
+\newcommand{\thesiscollege}{计算机与信息技术学院}
+\newcommand{\thesismajorline}{软件工程/2026 届}
+\newcommand{\thesisadvisor}{丁蕊}
+\newcommand{\thesisadvisorrole}{副教授}
+\newcommand{\thesisenterpriseadvisor}{}
+\newcommand{\thesisdateyear}{2026}
+\newcommand{\thesisdatemonth}{04}
+\newcommand{\thesisdateday}{25}
+\newcommand{\thesislogopath}{img/logo.png}
+\newcommand{\thesislogowidth}{15cm}
+
+% ----- 宏包 -----
+\usepackage{ctex}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage[subfigure]{tocloft}
+\usepackage{svg}
+\usepackage{subfigure}
+\usepackage{float}
+\usepackage[export]{adjustbox}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{bibentry}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{abstract}
+\usepackage{url}
+\usepackage{bm}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{supertabular}
+\usepackage{changepage}
+\usepackage{enumerate}
+\usepackage{caption}
+\usepackage{indentfirst}
+\usepackage{chngcntr}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{times}
+
+% 页边距：与 Word 模板主节 A4 设置对齐（上/下 2.54cm，左/右 3.18cm）
+\usepackage[left=3.18cm,right=3.18cm,top=2.54cm,bottom=2.54cm,headheight=14pt]{geometry}
+
+\renewcommand{\baselinestretch}{1.5}
+
+% ----- 全局正文字体：中文宋体小四（西文 Times 由 times 包） -----
+\AtBeginDocument{\songti\zihao{-4}}
+
+% ----- 摘要环境（中文摘要正文宋体小四；标题黑体小二号居中） -----
+\setlength{\absleftindent}{0pt}
+\setlength{\absrightindent}{0pt}
+\renewcommand{\abstractname}{摘\quad 要}
+\renewcommand{\abstractnamefont}{\centering\heiti\zihao{-2}}
+\renewcommand{\abstracttextfont}{\normalfont\songti\zihao{-4}}
+
+% ----- 关键词（摘要后空两行再写；关键词标签黑体，内容宋体小四） -----
+\newenvironment{thesiskeywords}{%
+  \par\vspace{2\baselineskip}%
+  \noindent{\heiti\zihao{-4} 关键词：}\songti\zihao{-4}%
+}{\par}
+
+% ----- 英文摘要 -----
+\newenvironment{thesisabstracten}{%
+  \begin{center}%
+  {\bfseries\zihao{-4} Abstract}%
+  \end{center}%
+  \vspace{\baselineskip}%
+  \begingroup
+  \zihao{-4}%
+  \setlength{\parindent}{2em}%
+}{\par\endgroup}
+
+\newcommand{\thesiskeywordsen}[1]{%
+  \par\vspace{0.5\baselineskip}%
+  \noindent\textbf{Keywords:} #1\par
+}
+
+% ----- 章节编号：第 1 章 … -----
+\renewcommand{\thesection}{第\arabic{section}章}
+\titleformat{\section}[block]{\centering\heiti\zihao{-2}}{\thesection}{0.5em}{}
+\titleformat{\subsection}[hang]{\heiti\zihao{-3}}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}[hang]{\heiti\zihao{4}}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.5ex plus 0.3ex minus 0.2ex}{0.8ex plus 0.2ex}
+\titlespacing*{\subsection}{2em}{1.2ex plus 0.3ex minus 0.2ex}{0.6ex plus 0.2ex}
+\titlespacing*{\subsubsection}{2em}{1ex plus 0.3ex minus 0.2ex}{0.5ex plus 0.2ex}
+
+% ----- 图、表按章编号：图 1-1、表 1-1；题注黑体五号 -----
+\counterwithin{figure}{section}
+\counterwithin{table}{section}
+\renewcommand{\thefigure}{\arabic{section}-\arabic{figure}}
+\renewcommand{\thetable}{\arabic{section}-\arabic{table}}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+% 图题、表题：黑体五号（10.5pt）
+\DeclareCaptionFont{thesiscap}{\heiti\fontsize{10.5pt}{15.75pt}\selectfont}
+\captionsetup{
+  font=thesiscap,
+  labelfont=thesiscap,
+  textfont=thesiscap,
+  labelsep=space,
+}
+
+% ----- 目录标题 -----
+\renewcommand{\contentsname}{目录}
+% 目录标题：黑体小二号居中（tocloft 双侧 \hfill 夹住标题）
+\renewcommand{\cfttoctitlefont}{\hfill\heiti\zihao{-2}}
+\renewcommand{\cftaftertoctitle}{\hfill\null\par\vspace{1\baselineskip}}
+
+% ----- 代码 listings -----
+\lstdefinelanguage{cypher}{
+  morekeywords={MATCH,RETURN,WHERE,AS,WITH,ORDER,LIMIT,OPTIONAL,CREATE,DELETE,MERGE,DETACH,SET,REMOVE,DROP,CALL,UNWIND,UNION,AND,OR,NOT,IN,CONTAINS,STARTS,ENDS,IS,NULL,CASE,WHEN,THEN,ELSE,END,DISTINCT,SKIP},
+  sensitive=false,
+  morecomment=[l]{//},
+  morestring=[b]',
+}
+\lstdefinelanguage{json}{
+  morekeywords={true,false,null},
+  sensitive=false,
+  morestring=[b]",
+  morecomment=[l]{//},
+}
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!10},
+  rulecolor=\color{gray!30},
+  numbers=none,
+  showstringspaces=false,
+  tabsize=2,
+  aboveskip=10pt,
+  belowskip=10pt
+}
+
+\setlength{\cftbeforesecskip}{3pt}
+\setlength{\cftbeforesubsecskip}{2pt}
+\setlength{\cftbeforesubsubsecskip}{1pt}
+
+% ----- 页眉页脚 -----
+\newcommand{\thesisheaderline}{牡丹江师范学院本科生毕业论文（设计）}
+\fancypagestyle{thesisempty}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+}
+\fancypagestyle{thesisfront}{%
+  \fancyhf{}%
+  \fancyhead[C]{\kaishu\zihao{5}\thesisheaderline}%
+  \renewcommand{\headrulewidth}{0.4pt}%
+}
+\fancypagestyle{thesismain}{%
+  \fancyhf{}%
+  \fancyhead[C]{\kaishu\zihao{5}\thesisheaderline}%
+  \fancyfoot[C]{\thepage}%
+  \renewcommand{\headrulewidth}{0.4pt}%
+}
+
+% ----- 封面 -----
+\newcommand{\thesiscover}{%
+  \thispagestyle{thesisempty}%
+  \begin{center}
+    \includegraphics[width=\thesislogowidth]{\thesislogopath}%
+    \vspace{0.5\baselineskip}
+
+    {\heiti\zihao{-2}\thesistitleline\par}%
+    \vspace{2cm}%
+
+    {\heiti\zihao{-2} 题目：\thesissubtitle\par}%
+    \vspace{3cm}%
+  \end{center}%
+  \begin{flushleft}
+    \heiti\zihao{3}%
+    \begin{tabbing}
+      姓\hspace{1.5em}名：\hspace{1.5em} \= \thesisauthor \quad \\[0.5cm]
+      学\hspace{1.5em}号：\> \thesisstudentid \\[0.5cm]
+      学\hspace{1.5em}院：\> \thesiscollege \\[0.5cm]
+      专业/届别：\> \thesismajorline \\[0.5cm]
+      指导教师：\> \thesisadvisor \\[0.5cm]
+      职\hspace{1.5em}称：\> \thesisadvisorrole \\[0.5cm]
+      \ifx\thesisenterpriseadvisor\empty\else
+      行企业指导教师：\> \thesisenterpriseadvisor \\[0.5cm]
+      \fi
+    \end{tabbing}%
+    \vfill
+    \begin{center}
+      {\heiti\zihao{3}\thesisdateyear 年\thesisdatemonth 月\thesisdateday 日\par}%
+    \end{center}%
+  \end{flushleft}%
+  \clearpage
+}
+
+% 后记级标题（结论 / 致谢 / 参考文献）：黑体小二号居中；不用 \section* 以免与 titlesec 冲突
+\newcommand{\thesisbackmattertitle}[1]{%
+  \begin{center}{\heiti\zihao{-2} #1\par}\end{center}%
+  \vspace{\baselineskip}%
+}
+
+\newenvironment{thesisconclusion}{%
+  \clearpage
+  \phantomsection
+  \thesisbackmattertitle{结论}%
+  \addcontentsline{toc}{section}{结论}%
+  \begingroup
+  \songti\zihao{-4}%
+}{%
+  \par\endgroup
+}
+
+\newenvironment{thesisacknowledgement}{%
+  \clearpage
+  \phantomsection
+  \thesisbackmattertitle{致谢}%
+  \addcontentsline{toc}{section}{致谢}%
+  \begingroup
+  \songti\zihao{-4}%
+}{%
+  \par\endgroup
+}
+
+\newcommand{\thesisbibliographyheading}{%
+  \clearpage
+  \phantomsection
+  \thesisbackmattertitle{参考文献}%
+  \addcontentsline{toc}{section}{参考文献}%
+}
+
+% ----- 颜色（按需保留） -----
+\newcommand{\red}[1]{\textcolor[rgb]{1.00,0.00,0.00}{#1}}
+\newcommand{\blue}[1]{\textcolor[rgb]{0.00,0.00,1.00}{#1}}
+\newcommand{\green}[1]{\textcolor[rgb]{0.00,1.00,0.00}{#1}}
+\newcommand{\darkblue}[1]{\textcolor[rgb]{0.00,0.00,0.50}{#1}}
+\newcommand{\darkgreen}[1]{\textcolor[rgb]{0.00,0.37,0.00}{#1}}
+\newcommand{\darkred}[1]{\textcolor[rgb]{0.60,0.00,0.00}{#1}}
+\newcommand{\brown}[1]{\textcolor[rgb]{0.50,0.30,0.00}{#1}}
+\newcommand{\purple}[1]{\textcolor[rgb]{0.50,0.00,0.50}{#1}}
+
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black}
