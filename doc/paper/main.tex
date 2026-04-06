@@ -400,7 +400,7 @@ Neo4j支持为一个节点设置多个标签（Multiple Labels），本系统利
 
 \subsubsection{数据规模}
 
-本系统使用的知识图谱数据规模如表~\ref{tab:data-scale}所示（各类节点互斥统计；占比列为占节点总计的百分比，设备类因数量极少写作``$<$0.1\%''）。\textbf{关系条数}按Neo4j中有向关系实例计数，与脚本中查询 \texttt{MATCH ()-[r]->() RETURN count(r)} 一致。\textbf{若与当前Neo4j库不一致，应以仓库内脚本 \texttt{scripts/neo4j\_paper\_stats.py} 的实时统计为准}，再回填论文表格。
+本系统使用的知识图谱数据规模如表~\ref{tab:data-scale}所示（各类节点互斥统计；占比列为占节点总计的百分比，设备类因数量极少写作``$<$0.1\%''）。\textbf{关系条数}按Neo4j中有向关系实例计数，与脚本中查询 \texttt{MATCH ()-[r]->() RETURN count(r)} 一致。
 
 \begin{table}[H]
     \centering
@@ -564,9 +564,9 @@ RETURN path LIMIT 20
 \end{lstlisting}
 
 \begin{lstlisting}[language=cypher, caption={配方原料路径查询（无方向）}]
--- 木剑的合成配方
+-- 石剑的合成配方
 MATCH path = (product:item)-[:PRODUCES]-(r:recipe)-[:CONSUMES]-(material:item)
-WHERE product.Name CONTAINS '剑'
+WHERE product.Name CONTAINS '石剑'
 RETURN path LIMIT 20
 \end{lstlisting}
 

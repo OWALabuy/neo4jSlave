@@ -117,11 +117,11 @@ RETURN path LIMIT 20
 说明：返回 原料-[CONSUMES]-配方-[PRODUCES]-产物 的完整网络（无方向匹配）
 
 ### 示例5: 配方的完整原料网络（无方向 - 重点）
-用户: "木剑的合成配方"
+用户: "石剑的合成配方"
 CQL:
 ```cypher
 MATCH path = (product:item)-[:PRODUCES]-(r:recipe)-[:CONSUMES]-(material:item)
-WHERE product.Name CONTAINS '剑'
+WHERE product.Name CONTAINS '石剑'
 RETURN path LIMIT 20
 ```
 说明：返回 产物-[PRODUCES]-配方-[CONSUMES]-原料 的完整网络（无方向匹配）
