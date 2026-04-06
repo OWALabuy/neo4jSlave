@@ -6,13 +6,13 @@
 % ----- 论文元数据（修改封面与个人信息时只改这里） -----
 \newcommand{\thesistitleline}{本科生毕业（设计）论文}
 \newcommand{\thesissubtitle}{基于自然语言的知识图谱查询与可视化系统研究与实现}
+\newcommand{\thesiscollege}{计算机与信息技术学院/自贸区学院}
+\newcommand{\thesisgrade}{2026 届}
+\newcommand{\thesismajor}{软件工程}
 \newcommand{\thesisauthor}{欧阳闻奕}
 \newcommand{\thesisstudentid}{2022102069}
-\newcommand{\thesiscollege}{计算机与信息技术学院}
-\newcommand{\thesismajorline}{软件工程/2026 届}
 \newcommand{\thesisadvisor}{丁蕊}
-\newcommand{\thesisadvisorrole}{副教授}
-\newcommand{\thesisenterpriseadvisor}{}
+\newcommand{\thesisenterpriseadvisor}{张杰}
 \newcommand{\thesisdateyear}{2026}
 \newcommand{\thesisdatemonth}{04}
 \newcommand{\thesisdateday}{25}
@@ -32,6 +32,10 @@
 \usepackage{xcolor}
 \usepackage{bibentry}
 \usepackage[numbers,sort&compress]{natbib}
+% 由 \thesisbibliographyheading 单独排「参考文献」标题，禁止 natbib 再 \section*{\refname}
+\makeatletter
+\renewcommand{\bibsection}{}
+\makeatother
 \usepackage{abstract}
 \usepackage{url}
 \usepackage{bm}
@@ -69,10 +73,10 @@
   \noindent{\heiti\zihao{-4} 关键词：}\songti\zihao{-4}%
 }{\par}
 
-% ----- 英文摘要 -----
+% ----- 英文摘要（标题与中文「摘要」对应：黑体小二号、加粗、居中） -----
 \newenvironment{thesisabstracten}{%
   \begin{center}%
-  {\bfseries\zihao{-4} Abstract}%
+  {\heiti\zihao{-2}\bfseries Abstract\par}%
   \end{center}%
   \vspace{\baselineskip}%
   \begingroup
@@ -82,12 +86,11 @@
 
 \newcommand{\thesiskeywordsen}[1]{%
   \par\vspace{0.5\baselineskip}%
-  \noindent\textbf{Keywords:} #1\par
+  \noindent{\heiti\zihao{-4}\textbf{Keywords:}} #1\par
 }
 
-% ----- 章节编号：第 1 章 … -----
-\renewcommand{\thesection}{第\arabic{section}章}
-\titleformat{\section}[block]{\centering\heiti\zihao{-2}}{\thesection}{0.5em}{}
+% ----- 章节编号：\thesection 仅为数字，保证小节为 4.1 而非「第4章.1」；章题用「第 n 章」另写 -----
+\titleformat{\section}[block]{\centering\heiti\zihao{-2}}{第\arabic{section}章}{0.5em}{}
 \titleformat{\subsection}[hang]{\heiti\zihao{-3}}{\thesubsection}{0.5em}{}
 \titleformat{\subsubsection}[hang]{\heiti\zihao{4}}{\thesubsubsection}{0.5em}{}
 \titlespacing*{\section}{0pt}{1.5ex plus 0.3ex minus 0.2ex}{0.8ex plus 0.2ex}
@@ -145,6 +148,10 @@
 \setlength{\cftbeforesecskip}{3pt}
 \setlength{\cftbeforesubsecskip}{2pt}
 \setlength{\cftbeforesubsubsecskip}{1pt}
+% 目录中章条显示「第 n 章」（\thesection 仍为纯数字，故用 presnum/aftersnum）
+\renewcommand{\cftsecpresnum}{第}
+\renewcommand{\cftsecaftersnum}{章}
+\setlength{\cftsecnumwidth}{4.2em}
 
 % ----- 页眉页脚 -----
 \newcommand{\thesisheaderline}{牡丹江师范学院本科生毕业论文（设计）}
@@ -155,6 +162,7 @@
 \fancypagestyle{thesisfront}{%
   \fancyhf{}%
   \fancyhead[C]{\kaishu\zihao{5}\thesisheaderline}%
+  \fancyfoot[C]{\thepage}%
   \renewcommand{\headrulewidth}{0.4pt}%
 }
 \fancypagestyle{thesismain}{%
@@ -164,37 +172,39 @@
   \renewcommand{\headrulewidth}{0.4pt}%
 }
 
-% ----- 封面 -----
+% ----- 封面（与 Word 模板：左标签三号黑体，论文题目内容小二号黑体；日期三号居中） -----
 \newcommand{\thesiscover}{%
   \thispagestyle{thesisempty}%
   \begin{center}
     \includegraphics[width=\thesislogowidth]{\thesislogopath}%
-    \vspace{0.5\baselineskip}
-
+    \vspace{0.6\baselineskip}
     {\heiti\zihao{-2}\thesistitleline\par}%
-    \vspace{2cm}%
-
-    {\heiti\zihao{-2} 题目：\thesissubtitle\par}%
-    \vspace{3cm}%
+    \vspace{1.8cm}%
   \end{center}%
-  \begin{flushleft}
-    \heiti\zihao{3}%
-    \begin{tabbing}
-      姓\hspace{1.5em}名：\hspace{1.5em} \= \thesisauthor \quad \\[0.5cm]
-      学\hspace{1.5em}号：\> \thesisstudentid \\[0.5cm]
-      学\hspace{1.5em}院：\> \thesiscollege \\[0.5cm]
-      专业/届别：\> \thesismajorline \\[0.5cm]
-      指导教师：\> \thesisadvisor \\[0.5cm]
-      职\hspace{1.5em}称：\> \thesisadvisorrole \\[0.5cm]
-      \ifx\thesisenterpriseadvisor\empty\else
-      行企业指导教师：\> \thesisenterpriseadvisor \\[0.5cm]
-      \fi
-    \end{tabbing}%
-    \vfill
-    \begin{center}
-      {\heiti\zihao{3}\thesisdateyear 年\thesisdatemonth 月\thesisdateday 日\par}%
-    \end{center}%
-  \end{flushleft}%
+  \noindent
+  \renewcommand{\arraystretch}{1}%
+  \begin{tabular}{@{}p{4.2cm}@{\hspace{0.6em}}p{\dimexpr\linewidth-4.2cm-0.6em\relax}@{}}%
+    {\heiti\zihao{3} 论文题目：} &
+      {\heiti\zihao{-2}\thesissubtitle\par} \\
+    {\heiti\zihao{3} 学\qquad 院：} &
+      {\heiti\zihao{3}\thesiscollege\par} \\
+    {\heiti\zihao{3} 年\qquad 级：} &
+      {\heiti\zihao{3}\thesisgrade\par} \\
+    {\heiti\zihao{3} 专\qquad 业：} &
+      {\heiti\zihao{3}\thesismajor\par} \\
+    {\heiti\zihao{3} 姓\qquad 名：} &
+      {\heiti\zihao{3}\thesisauthor\par} \\
+    {\heiti\zihao{3} 学\qquad 号：} &
+      {\heiti\zihao{3}\thesisstudentid\par} \\
+    {\heiti\zihao{3} 指导教师：} &
+      {\heiti\zihao{3}\thesisadvisor\par} \\
+    {\heiti\zihao{3} 行企业指导教师：} &
+      {\heiti\zihao{3}\ifx\thesisenterpriseadvisor\empty ——\else\thesisenterpriseadvisor\fi\par} \\
+  \end{tabular}%
+  \par\vfill
+  \begin{center}
+    {\heiti\zihao{3}\thesisdateyear 年\thesisdatemonth 月\thesisdateday 日\par}%
+  \end{center}%
   \clearpage
 }
 

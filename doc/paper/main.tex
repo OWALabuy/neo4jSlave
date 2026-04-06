@@ -7,8 +7,13 @@
 
 \thesiscover
 
+% 前置部分：罗马数字页码（I, II, …），条目写入目录
+\pagenumbering{roman}
+\setcounter{page}{1}
 \pagestyle{thesisfront}
 
+\phantomsection
+\addcontentsline{toc}{section}{摘要}
 \begin{abstract}
     知识图谱作为一种语义网络，能够以图结构形式描述实体及其之间的关系，在知识管理、智能问答、推荐系统等领域有着广泛的应用。然而，传统知识图谱查询需要用户掌握Cypher等查询语言，对非技术用户存在一定门槛。
 
@@ -23,6 +28,8 @@
 
 \newpage
 
+\phantomsection
+\addcontentsline{toc}{section}{Abstract}
 \begin{thesisabstracten}
 Knowledge graphs, as semantic networks, can describe entities and their relationships in graph structure, and have wide applications in knowledge management, intelligent question answering, and recommendation systems. However, traditional knowledge graph queries require users to master query languages such as Cypher, which presents certain barriers for non-technical users.
 
@@ -34,6 +41,8 @@ Experimental results show that the system can accurately understand user natural
 
 \newpage
 
+\phantomsection
+\addcontentsline{toc}{section}{目录}
 \tableofcontents
 \newpage
 
@@ -858,12 +867,6 @@ WRITE_BLACKLIST = [
 
 \end{thesisconclusion}
 
-\begin{thesisacknowledgement}
-
-感谢指导教师丁蕊副教授的悉心指导，感谢学校提供的良好学习环境。
-
-\end{thesisacknowledgement}
-
 \thesisbibliographyheading
 \begin{thebibliography}{99}% 参考文献，{}内表示序号最大位数（两位）
 	\bibitem{ref1}王鑫, 邹磊, 王朝坤, 等. 知识图谱数据管理研究综述[J]. 软件学报, 2019, 30(7): 2139-2174.
@@ -877,4 +880,10 @@ WRITE_BLACKLIST = [
 	\bibitem{ref9}OpenAI. GPT-4 Technical Report[R]. arXiv preprint arXiv:2303.08774, 2023.
 	\bibitem{ref10}Fielding R T. Architectural styles and the design of network-based software architectures[D]. University of California, Irvine, 2000.
 \end{thebibliography}
+
+\begin{thesisacknowledgement}
+
+感谢指导教师丁蕊副教授的悉心指导，感谢学校提供的良好学习环境。
+
+\end{thesisacknowledgement}
 \end{document}
