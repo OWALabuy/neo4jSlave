@@ -40,7 +40,9 @@
 \usepackage{url}
 \usepackage{bm}
 \usepackage{multirow}
+\usepackage{array}
 \usepackage{booktabs}
+\usepackage{tabularx}
 \usepackage{longtable}
 \usepackage{supertabular}
 \usepackage{changepage}
@@ -73,10 +75,10 @@
   \noindent{\heiti\zihao{-4} 关键词：}\songti\zihao{-4}%
 }{\par}
 
-% ----- 英文摘要（标题与中文「摘要」对应：黑体小二号、加粗、居中） -----
+% ----- 英文摘要（标题小二号加粗：西文用 \normalfont\bfseries，避免仅设黑体时英文不变粗） -----
 \newenvironment{thesisabstracten}{%
   \begin{center}%
-  {\heiti\zihao{-2}\bfseries Abstract\par}%
+  {\zihao{-2}\normalfont\bfseries Abstract\par}%
   \end{center}%
   \vspace{\baselineskip}%
   \begingroup
@@ -86,7 +88,7 @@
 
 \newcommand{\thesiskeywordsen}[1]{%
   \par\vspace{0.5\baselineskip}%
-  \noindent{\heiti\zihao{-4}\textbf{Keywords:}} #1\par
+  \noindent{\zihao{-4}\normalfont\bfseries Keywords:} \normalfont\zihao{-4}#1\par
 }
 
 % ----- 章节编号：\thesection 仅为数字，保证小节为 4.1 而非「第4章.1」；章题用「第 n 章」另写 -----
@@ -152,6 +154,8 @@
 \renewcommand{\cftsecpresnum}{第}
 \renewcommand{\cftsecaftersnum}{章}
 \setlength{\cftsecnumwidth}{4.2em}
+% tocloft 默认在目录标题处执行 \thispagestyle{plain}，会打出页码；改为与目录专用样式一致
+\tocloftpagestyle{thesistoc}
 
 % ----- 页眉页脚 -----
 \newcommand{\thesisheaderline}{牡丹江师范学院本科生毕业论文（设计）}
@@ -163,6 +167,12 @@
   \fancyhf{}%
   \fancyhead[C]{\kaishu\zihao{5}\thesisheaderline}%
   \fancyfoot[C]{\thepage}%
+  \renewcommand{\headrulewidth}{0.4pt}%
+}
+% 目录页：保留页眉，不显示页码（且目录不写入目录）
+\fancypagestyle{thesistoc}{%
+  \fancyhf{}%
+  \fancyhead[C]{\kaishu\zihao{5}\thesisheaderline}%
   \renewcommand{\headrulewidth}{0.4pt}%
 }
 \fancypagestyle{thesismain}{%
