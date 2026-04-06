@@ -79,9 +79,9 @@ QUERY_HARD_LIMIT=200
 ### API 概览
 - GET `/health` 健康检查
 - GET `/schema` 返回标签与关系类型
-- POST `/run-cql` 执行用户提供的只读 CQL
+- POST `/run-cql` 执行用户提供的只读 Cypher（请求字段名历史原因仍为 `cql`）
   - body: `{ "cql": "MATCH ...", "params": {"name": "Alice"} }`
-- POST `/nlq` 自然语言 → CQL → 执行 → ECharts JSON
+- POST `/nlq` 自然语言 → Cypher → 执行 → ECharts JSON
   - body: `{ "query": "查找 Alice 的同事", "options": {"limit": 100} }`
 
 ### 提示词可控
@@ -93,7 +93,15 @@ QUERY_HARD_LIMIT=200
 - 统一超时与返回行数限制，避免一次性大图卡死
 
 ### 前端
-- 使用 ECharts 渲染 `graph`，支持展示生成的 CQL 与手动执行
+- 使用 ECharts 渲染 `graph`，支持展示 LLM 生成的 Cypher 与手动 Cypher 模式
+
+### 论文与数据口径（重要）
+- **节点/关系规模**：`doc/paper/main.tex` 中「知识图谱数据规模」表应与真实库一致。配置好 `.env` 后运行：
+  ```bash
+  python3 scripts/neo4j_paper_stats.py
+  ```
+  将输出的计数与「互斥分类之和」「全库节点总数」核对后再改论文；若存在仅带其它标签的节点，二者可能不等，应在文中说明统计口径。
+- **自然语言准确率**：pytest 中 `/nlq` 用例 **Mock 了 LLM**，通过只说明链路正确，**不**代表真实 NL 准确率。人工 21 条评测需在固定模型版本与判定标准下单独记录（可附问句清单与判定规则）。
 
 ### 发展方向
 - 路径查询、邻居展开、分页与聚类
@@ -140,9 +148,10 @@ python -m pytest tests/ --cov=backend/app --cov-report=html
 
 | 模块 | 测试内容 | 测试数量 |
 |------|---------|---------|
-| `cql_validator` | 只读 CQL 验证、黑名单检查 | 18+ |
-| `echarts_converter` | 图数据转换、表格构建 | 13+ |
-| `api` | 端点响应、错误处理、Mock 集成 | 7+ |
+| `cql_validator` | 只读 Cypher 验证、黑名单、`explain_safe` | 19 |
+| `echarts_converter` | 图数据转换、表格构建 | 11 |
+| `api` | 端点响应、错误处理、Mock 集成 | 8 |
+| **合计** | | **38** |
 
 ### 编写新测试
 

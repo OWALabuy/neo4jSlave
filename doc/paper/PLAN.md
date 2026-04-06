@@ -1,5 +1,34 @@
 # 论文实现步骤规划
 
+## 修订流程（迈向定稿）
+
+以下为「项目 + 论文」一并收敛到可答辩状态的推荐顺序；**已完成**项在对应小节勾掉即可。
+
+### A. 数据与表述可核对（专项行动）
+1. [ ] 连接真实 Neo4j，运行 `python3 scripts/neo4j_paper_stats.py`，核对 `sum_typed_rows` 与 `total_nodes_all_labels`；若不等，在论文「数据规模」节补充说明（例如存在未列入表的标签）。
+2. [ ] 用脚本输出更新 `main.tex` 表 4-2 的数量与占比列，并复核关系总数 `total_relationships`。
+3. [ ] 固定 NLQ 人工评测：**模型名、API、温度、21 条问句原文、通过判定标准**（可另存 `doc/paper/nlq_eval_cases.md` 或附件），保证与表 5-1 可一一对照。
+
+### B. 论文内容（LaTeX）
+1. [x] 摘要/英文摘要与 NLQ 实测通过率一致，区分 pytest 与人工评测。
+2. [x] 数据规模表行求和与「节点总计」一致；注明以脚本为准。
+3. [x] 结论中复杂查询短板引用表 5-1 类别，避免误用「38.1\%」指复杂查询。
+4. [x] 安全机制与实现对齐：黑名单全文、`ENABLE_EXPLAIN_VALIDATE` 默认关闭、超时环境变量。
+5. [ ] 通读全文，将剩余「CQL」统一为「Cypher」叙述（API 路径 `run-cql`、字段名 `cql`、模块名 `cql_validator` 可保留英文）。
+6. [ ] 核对参考文献：会议页码、arXiv 编号、网页检索日期；删除或替换无法核实的条目。
+7. [ ] 按学院 Word/LaTeX 规范终检：图表题、目录、参考文献体例。
+
+### C. 代码与工程
+1. [x] README 说明：数据脚本、NLQ 评测与 pytest 边界。
+2. [ ] 提交前 `python -m pytest tests/ -q` 全绿；按需补充 `DROP ...` 等黑名单的边界用例。
+3. [ ] （可选）生产部署：收紧 CORS、只读库账号、开启 EXPLAIN 或 WAF 等——若写进论文需如实描述部署形态。
+
+### D. 素材
+1. [ ] 架构图/流程图与**当前** API、模块划分一致。
+2. [ ] 界面截图分辨率与学校要求一致。
+
+---
+
 ## 项目信息
 - **论文题目**：基于自然语言的知识图谱查询与可视化系统研究与实现
 - **英文题目**：Research and Implementation of Natural Language-based Knowledge Graph Query and Visualization System
