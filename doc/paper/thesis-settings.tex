@@ -154,6 +154,8 @@
 \renewcommand{\cftsecpresnum}{第}
 \renewcommand{\cftsecaftersnum}{章}
 \setlength{\cftsecnumwidth}{4.2em}
+% article + tocloft 默认 \cftsecdotsep=\cftnodots，「章」级目录无引导点；摘要/Abstract/第n章 与正文章条应统一为点线至页码（导师意见第2条）
+\renewcommand{\cftsecdotsep}{\cftdotsep}
 % tocloft 默认在目录标题处执行 \thispagestyle{plain}，会打出页码；改为与目录专用样式一致
 \tocloftpagestyle{thesistoc}
 
