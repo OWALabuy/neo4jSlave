@@ -58,9 +58,31 @@ Automated pytest tests (38 cases) all pass. On 21 manually executed natural-lang
 
 Neo4j 是当前主流的图数据库之一，采用属性图模型与 Cypher 语言，在路径查询、模式匹配与事务支持上较为成熟，适合作为本课题的存储与查询引擎。与此同时，\textbf{Cypher 属于形式化查询语言}：需理解标签、关系类型、可选匹配与路径变量等概念；对非计算机专业用户或希望「像聊天一样问一句就得到图」的使用场景而言，\textbf{直接使用 Cypher 的门槛明显偏高}。近年来大语言模型（LLM）在代码与结构化查询生成任务上进展显著，为「自然语言 → Cypher」提供了可工程化的技术路径。
 
-知识图谱数据管理、属性图数据库基础及 LLM 与知识图谱融合的研究脉络可参见文献\cite{ref1,ref3,ref11}；Cypher 子句与语义以 Neo4j 官方手册为准\cite{ref12}。本系统涉及的工程栈（Python 语言、Starlette/FastAPI、浏览器端 JavaScript、Neo4j 与 ECharts 等）另以各官方文档为主要依据\cite{ref6,ref7,ref8,ref13,ref14,ref15}。
+\textbf{下一小节}将从国内外文献出发，对知识图谱的数据管理、图查询与接口、自然语言到结构化查询以及大语言模型与知识图谱的融合研究做系统梳理，并在此基础上明确\textbf{本文工作与既有研究的关系}。各具体技术组件的工程文档与选型依据集中在第2章结合实现引用\cite{ref6,ref7,ref8,ref12,ref13,ref14,ref15}。
 
-本文选题的特殊性在于：\textbf{不是泛泛讨论知识图谱理论}，而是面向\textbf{真实领域数据}（《迷你世界》游戏知识图谱，含数千节点与上万有向关系），构建一套可运行的 Web 系统，使\textbf{零 Cypher 基础的用户}仍能通过中文问句完成常见探索（查物品、查合成链、查掉落、查挖掘方式等），并把结果以\textbf{图谱 + 表格}形式呈现。该问题兼具\textbf{应用价值}（降低工具使用成本）与\textbf{技术挑战性}（领域 Schema 复杂、LLM 生成需约束与安全校验）。
+\subsection{国内外研究现状}
+
+\subsubsection{知识图谱的数据模型、存储与查询基础}
+
+知识图谱以实体—关系—属性刻画世界，既可建立在 RDF 三元组与 SPARQL 查询之上，也可采用属性图模型与声明式图查询语言（如 Cypher）实现存储与推理支撑。Hogan 等对知识图谱的概念、数据模型、查询与约束语言、知识获取与质量等进行了系统综述，指出图抽象在集成异构数据与支持复杂分析方面的优势，同时也强调\textbf{查询语言学习成本}与\textbf{模式演化}带来的工程挑战\cite{ref17}。国内方面，王鑫等从数据管理视角梳理了知识图谱的存储、查询与知识融合等问题，讨论了大规模图数据上的索引、优化与事务需求\cite{ref1}。上述工作为本文将领域数据建模为\textbf{可查询的属性图}、并在应用层暴露统一查询接口提供了理论与技术语境。
+
+在\textbf{属性图与图数据库}方向，Robinson 等阐述了以图为中心的数据建模思想及与关系型存储的差异\cite{ref3}；Miller 等较早总结了 Neo4j 等图数据库在关联分析中的应用形态\cite{ref2}。Cypher 作为面向模式匹配与路径表达的语言，其语义与执行细节以官方手册为权威说明\cite{ref12}。相较 RDF/SPARQL 生态在开放关联数据与本体推理上的传统优势，属性图与 Cypher 在\textbf{工程落地、与程序语言集成、以及面向业务团队的迭代速度}上更契合本课题已有数据管线，这也是后文技术路线选择 Neo4j 而非另起 RDF 栈的现实原因之一。
+
+\subsubsection{自然语言到结构化查询：从 Text-to-SQL 到 Text-to-Cypher}
+
+降低结构化查询语言的使用门槛，是自然语言接口研究的长期主题。关系数据库方向上，基于深度学习的 Text-to-SQL 综述系统归纳了编码器—解码器、中间表示与预训练语言模型等路线，指出\textbf{模式（Schema）感知}与\textbf{可执行性约束}是决定生成质量的关键因素\cite{ref5}。图数据库侧，近年出现将自然语言直接映射为 Cypher 的 Text2Cypher 任务：Ozsoy 等指出，尽管可用大模型进行零样本生成，但在复杂语义与多跳约束上仍易出现不完整或错误语句；高质量公开语料相对稀缺，而通过清洗整合多源样本进行微调可显著提升 BLEU 与精确匹配等指标\cite{ref16}。这与关系场景下的经验一致——\textbf{数据与约束}往往比单纯扩大模型规模更能带来可控收益。
+
+从\textbf{问答（QA）}视角看，面向知识图谱的语义问答长期依赖「自然语言 → SPARQL/SQL/其它逻辑形式」的解析或检索—排序流水线；其体系结构与评测基准与 Text-to-SQL 存在可类比之处，即都需要在\textbf{词汇鸿沟}、\textbf{组合泛化}与\textbf{执行安全}之间权衡。本文将「NL→Cypher」置于同类问题框架下理解，但在实现上采用\textbf{提示学习 + 应用层只读校验}的工程路径，而非训练专用 Text2Cypher 模型：这既受毕业设计周期与算力条件约束，也与当前工业界广泛采用的「通用 LLM + 领域 Prompt」范式一致（见下节）。
+
+\subsubsection{大语言模型、提示学习与知识图谱的融合}
+
+GPT-3 等模型展示了通过上下文示例进行少样本学习的潜力\cite{ref4}；后续 GPT-4 技术报告进一步说明了大规模多任务训练后模型在代码与工具使用类任务上的能力提升\cite{ref9}。Pan 等从路线图角度归纳了大语言模型与知识图谱在知识增强、对齐、推理与可解释性等方向的结合方式，指出二者既可\textbf{互相增强}（图谱为模型提供事实锚点，模型为图谱提供语言接口），也会引入\textbf{幻觉与一致性}风险，需要通过检索、约束解码或外部验证环节加以抑制\cite{ref11}。
+
+将上述脉络映射到\textbf{图数据库自然语言查询}场景，可以概括为：LLM 提供灵活的语义映射能力，图数据库与 Cypher 提供可执行、可审计的查询载体，而\textbf{中间层安全策略}（只读、参数绑定、超时与结果规模控制）则是把「研究原型」推进为「可部署服务」的常见必要条件。现有 Text2Cypher 文献多聚焦于\textbf{数据集构建与生成指标}，对「与具体 Web 系统、多标签领域 Schema、以及前端图可视化联动的端到端实现」着墨相对较少；语义问答综述亦较少以 Neo4j 属性图与中文游戏领域数据为主对象。
+
+\subsubsection{小结与本文定位}
+
+综上，国内外研究在\textbf{知识图谱基础理论}、\textbf{图查询与数据管理}、\textbf{自然语言到结构化查询}以及\textbf{LLM 与知识图谱协同}等方面已积累丰富成果，为本文提供了清晰的问题坐标。与上述工作相比，本文\textbf{不追求训练新的 Text2Cypher 模型或提出新的图查询语言理论}，而是面向《迷你世界》这一\textbf{真实领域属性图}，设计并实现一套可复现的 B/S 系统：以通用大模型与提示工程完成中文问句到参数化 Cypher 的转换，以应用层校验保障只读安全，并将查询结果映射为 ECharts 图谱与表格的联合展示，从而形成\textbf{「自然语言—执行—可视化—约束」闭环}。该定位兼顾了导师所强调的\textbf{可复现工程交付}与当前文献中已得到验证的技术要素，后续章节将据此展开需求、设计与实现。
 
 \subsection{问题描述与挑战}
 
@@ -1175,6 +1197,8 @@ def test_basic_node_conversion(self, sample_records):
 	\bibitem{ref13}Python Software Foundation. The Python Language Reference, Python 3.12 documentation[EB/OL]. \url{https://docs.python.org/3/reference/} (accessed 2026-04-06)
 	\bibitem{ref14}Encode OSS Ltd. Starlette documentation[EB/OL]. \url{https://www.starlette.io/} (accessed 2026-04-06)
 	\bibitem{ref15}Mozilla Developer Network. MDN Web Docs: JavaScript reference[EB/OL]. \url{https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference} (accessed 2026-04-06)
+	\bibitem{ref16}Ozsoy M G, Messallem L, Besga J, et al. Text2Cypher: Bridging Natural Language and Graph Databases[J/OL]. arXiv:2412.10064, 2024. \url{https://arxiv.org/abs/2412.10064}
+	\bibitem{ref17}Hogan A, Blomqvist E, Cochez M, et al. Knowledge Graphs[J]. ACM Computing Surveys, 2021, 54(4): 1--37. DOI: \url{https://doi.org/10.1145/3447772}
 \end{thebibliography}
 
 \begin{thesisacknowledgement}
