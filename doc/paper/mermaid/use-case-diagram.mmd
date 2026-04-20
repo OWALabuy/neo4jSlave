@@ -1,0 +1,35 @@
+%% neo4jSlave 系统用例图（Mermaid 示意）
+%% 导出：mermaid-cli 或 https://mermaid.live 导出 PNG/SVG；
+%% 定稿可手绘对齐后替换论文 img/use-case.png 与 main.tex 中的占位图。
+
+flowchart TB
+    U(("终端用户"))
+    H(("高级用户/调试者"))
+    LLM(("外部：大语言模型 API"))
+    NEO(("外部：Neo4j"))
+
+    subgraph B["系统边界：neo4jSlave"]
+        UC1["UC1 自然语言查询"]
+        UC2["UC2 执行只读 Cypher"]
+        UC3["UC3 获取 Schema"]
+        UC4["UC4 图谱可视化"]
+        UC5["UC5 表格与语句回显"]
+        UC0["横切：只读与参数校验"]
+    end
+
+    U --> UC1
+    U --> UC4
+    U --> UC5
+    U --> UC3
+    H --> UC2
+    H --> UC3
+    H --> UC4
+    H --> UC5
+
+    UC1 --> LLM
+    UC1 --> UC0
+    UC2 --> UC0
+    UC3 --> NEO
+    UC0 --> NEO
+    UC1 --> NEO
+    UC2 --> NEO
