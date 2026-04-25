@@ -378,7 +378,7 @@ def main():
         import_relationships(driver, "recipe_produces", "PRODUCES", "recipe", "item",
                             {'from_id': 'recipeId', 'to_id': 'targetId', 'Count': 'count'})
         
-        # 以下为旧版「单标签 + 桥接」方案：GDB 等不支持多标签时，用 PLACE/SUMMON 连接 item 与 block/monster 节点。
+        # 以下为旧版“单标签 + 桥接”方案：GDB 等不支持多标签时，用 PLACE/SUMMON 连接 item 与 block/monster 节点。
         # 若当前库采用 Neo4j 多标签（:item:block / :item:monster 与道具合一），论文与查询均不再依赖此二关系，可整段删除或改为条件导入。
         import_relationships(driver, "item_place", "PLACE", "item", "block",
                             {'from_id': 'itemId', 'to_id': 'blockId'})

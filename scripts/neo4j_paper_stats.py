@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-从 Neo4j 统计论文「数据规模」表所需数字，便于与 doc/paper/main.tex 对齐。
+从 Neo4j 统计论文“数据规模”表所需数字，便于与 doc/paper/main.tex 对齐。
 
 用法（与 backend 相同环境变量）：
   cd /path/to/neo4jSlave

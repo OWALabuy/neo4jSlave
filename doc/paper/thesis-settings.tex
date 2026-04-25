@@ -32,7 +32,7 @@
 \usepackage{xcolor}
 \usepackage{bibentry}
 \usepackage[numbers,sort&compress]{natbib}
-% 由 \thesisbibliographyheading 单独排「参考文献」标题，禁止 natbib 再 \section*{\refname}
+% 由 \thesisbibliographyheading 单独排“参考文献”标题，禁止 natbib 再 \section*{\refname}
 \makeatletter
 \renewcommand{\bibsection}{}
 \makeatother
@@ -91,7 +91,7 @@
   \noindent{\zihao{-4}\normalfont\bfseries Keywords:} \normalfont\zihao{-4}#1\par
 }
 
-% ----- 章节编号：\thesection 仅为数字，保证小节为 4.1 而非「第4章.1」；章题用「第 n 章」另写 -----
+% ----- 章节编号：\thesection 仅为数字，保证小节为 4.1 而非“第4章.1”；章题用“第 n 章”另写 -----
 \titleformat{\section}[block]{\centering\heiti\zihao{-2}}{第\arabic{section}章}{0.5em}{}
 \titleformat{\subsection}[hang]{\heiti\zihao{-3}}{\thesubsection}{0.5em}{}
 \titleformat{\subsubsection}[hang]{\heiti\zihao{4}}{\thesubsubsection}{0.5em}{}
@@ -150,11 +150,11 @@
 \setlength{\cftbeforesecskip}{3pt}
 \setlength{\cftbeforesubsecskip}{2pt}
 \setlength{\cftbeforesubsubsecskip}{1pt}
-% 目录中章条显示「第 n 章」（\thesection 仍为纯数字，故用 presnum/aftersnum）
+% 目录中章条显示“第 n 章”（\thesection 仍为纯数字，故用 presnum/aftersnum）
 \renewcommand{\cftsecpresnum}{第}
 \renewcommand{\cftsecaftersnum}{章}
 \setlength{\cftsecnumwidth}{4.2em}
-% article + tocloft 默认 \cftsecdotsep=\cftnodots，「章」级目录无引导点；摘要/Abstract/第n章 与正文章条应统一为点线至页码（导师意见第2条）
+% article + tocloft 默认 \cftsecdotsep=\cftnodots，“章”级目录无引导点；摘要/Abstract/第n章 与正文章条应统一为点线至页码（导师意见第2条）
 \renewcommand{\cftsecdotsep}{\cftdotsep}
 % tocloft 默认在目录标题处执行 \thispagestyle{plain}，会打出页码；改为与目录专用样式一致
 \tocloftpagestyle{thesistoc}
