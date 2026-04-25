@@ -17,9 +17,9 @@
 \begin{abstract}
     知识图谱作为一种语义网络，能够以图结构形式描述实体及其之间的关系，在知识管理、智能问答、推荐系统等领域有着广泛的应用。然而，传统知识图谱查询需要用户掌握Cypher等查询语言，对非技术用户存在一定门槛。
 
-    本文设计并实现了一个基于自然语言的知识图谱查询与可视化系统（neo4jSlave），该系统采用B/S架构，通过FastAPI构建后端服务，结合大语言模型实现自然语言到Cypher查询语句的转换，并利用ECharts进行查询结果的可视化展示。系统具有只读安全限制、参数化查询、以及通过环境变量切换Neo4j与LLM端点等特性，降低了知识图谱的使用门槛。
+    针对上述问题，本文设计并实现了一个基于自然语言的知识图谱查询与可视化系统（neo4jSlave），采用常见的浏览器/服务器结构：用户只需在网页中用中文提问，无需在本地安装图数据库客户端。服务端使用 FastAPI 提供应用接口，在收到问句后先从 Neo4j 中读取当前图数据的结构信息（如实体类型、关系类型），与问句一起交给大语言模型，引导其生成与当前库结构相符、且带参数的只读图查询语句；随后由专门模块对查询语句做规则校验（如禁止写入类操作、绑定参数），再调用 Neo4j 执行。查询结果在浏览器中除表格外，还通过 ECharts 以点边关系图等形式呈现，使“谁与谁如何相连”更直观。图数据库地址、大模型服务地址等可通过环境变量统一配置，便于换环境与复现。整体上，系统把“问一句话”到“看到图上的关系”串成连续流程，弱化了形式化查询语言对终端用户的显式要求。
 
-    实验结果表明，系统在pytest自动化测试（38项）中全部通过；在人工设计的21条自然语言用例评测中（2026年4月6日实测，问句与判定记录见\texttt{nlq\_eval\_protocol.md}），整体通过率约为81.0\%（17/21）；道具、合成、掉落、生物类问句表现突出，方块“掉落”与分组、多实体对比类仍存在失误。系统能够将多数常见问句转为可执行Cypher并以图谱或表格/JSON形式展示，具有一定的实用价值。
+    在验证方面，对关键模块与对外接口进行了自动化测试，用例均通过，保证了实现与需求约定的一致性。另以自建自然语言问句做人工走查，绝大多数常见问句能端到端得到可执行查询与可视化结果，在表述复杂或易歧义的情形下仍可能出现答非所问或取数不完整，有进一步改进空间。本工作为在垂直领域图数据上搭建“低门槛、可复现”的自然语言查询与可视化模式提供了一套完整、可沿用的工程化路径。
 \end{abstract}
 
 \begin{thesiskeywords}
@@ -33,9 +33,9 @@
 \begin{thesisabstracten}
 Knowledge graphs, as semantic networks, can describe entities and their relationships in graph structure, and have wide applications in knowledge management, intelligent question answering, and recommendation systems. However, traditional knowledge graph queries require users to master query languages such as Cypher, which presents certain barriers for non-technical users.
 
-This paper designs and implements a natural language-based knowledge graph query and visualization system (neo4jSlave). The system adopts B/S architecture, builds backend services with FastAPI, uses large language models to convert natural language to Cypher queries, and utilizes ECharts for visualization of query results. The system features read-only security restrictions, parameterized queries, and configurable Neo4j/LLM endpoints via environment variables, lowering the barrier to using knowledge graphs.
+To address this gap, this paper designs and implements a natural language--based knowledge graph query and visualization system (neo4jSlave) using a browser/server architecture. Users ask questions in Chinese on a web page, without installing a graph client locally. A FastAPI backend fetches the current graph schema (entity and relationship types) from Neo4j, combines it with the question, and prompts a large language model to produce a parameterized, read-only query aligned with the schema. A dedicated layer validates the query (e.g., enforcing read-only and parameter binding) before execution against Neo4j. Results are shown as tables and as node--link diagrams via ECharts, making relationships easy to read. Service endpoints, the graph database, and the LLM API are configurable through environment variables to support deployment and replication. The design connects ``natural language in'' to ``graphical insight out'' while keeping formal query language usage implicit for end users.
 
-Automated pytest tests (38 cases) all pass. On 21 manually executed natural-language questions (recorded on 2026-04-06 in \texttt{nlq\_eval\_protocol.md}), the end-to-end success rate is about 81.0\% (17/21), with strong results on item, crafting, drop, and creature queries, while block-drop phrasing, group ID semantics, and multi-entity comparisons remain error-prone.
+On the evaluation side, automated tests cover the main modules and public interfaces and all pass, supporting consistency with the specified behavior. A manual walk-through with custom natural-language questions shows that most routine questions yield executable queries and visualizations end-to-end; on highly complex or ambiguous phrasings, incorrect or partial answers can still occur. The work offers a full, replicable engineering path for low-threshold, natural-language query and visualization over domain-specific graph data.
 \end{thesisabstracten}
 \thesiskeywordsen{Knowledge Graph; Natural Language Processing; Cypher Query; Neo4j; Large Language Model; Data Visualization; FastAPI}
 
