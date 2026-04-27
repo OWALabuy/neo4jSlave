@@ -1,0 +1,60 @@
+% 由 main.tex 在 \appendix 之后以 \input{appendix-nlq-prompt} 引入
+\section{自然语言提示词与调试说明补遗}
+\label{app:prompt-supplement}
+
+本附录收自第5章初稿，供需要对照完整提示词模板与多组示例的读者使用；与仓库内 \texttt{system\_prompt.txt} 及第4章自然语言时序应一致。
+
+\subsection{提示词分块（与正文第5.1节概括对应）}
+
+\paragraph{（1）角色定义。}
+首先明确由 LLM 在只读前提下生成 Cypher，禁止写操作。
+
+\paragraph{（2）Schema 描述。}
+详细描述知识图谱的多标签结构：
+\begin{itemize}
+    \item 基础标签：:item（所有道具的父类，包含通用属性ID, Name, Type, Disc, GetWay）
+    \item 复合标签：:item:block（方块，继承:item并添加MineTool, ToolLevel属性）、:item:monster（生物，继承:item并添加Life, Attack属性）
+    \item 其他标签：:group（分组）、:recipe（配方）、:smelt（熔炼）、:device（设备）
+    \item 关系类型：IN\_GROUP、CONSUMES、PRODUCES、DROPS、TOOLMINEDROPS等12种关系
+\end{itemize}
+
+\paragraph{（3）多标签查询语法。}
+\begin{itemize}
+    \item 查询方块：\texttt{MATCH (n:item:block) WHERE n.Name CONTAINS '关键词'}
+    \item 查询生物：\texttt{MATCH (n:item:monster) WHERE n.Name CONTAINS '关键词'}
+    \item 查询纯道具：\texttt{MATCH (n:item) WHERE NOT n:block AND NOT n:monster}
+\end{itemize}
+
+\paragraph{（4）路径查询与返回形态。}
+引导生成返回 Path 的查询，并可用无方向关系扩大模式匹配。错误、次优与可接受示例见第5章正文；路径返回较纯节点更利于 \texttt{echarts\_converter} 恢复边。无向与有向在 Cypher 语义上不等价，无向在探索性问句中可扩大命中，亦可能增加噪声边，属提示选择而非普适优劣。
+
+\paragraph{（5）Few-shot 补充示例。}
+以下标题中“方块挖掘”“生物掉落”等来自本文案例数据，仅作模式演示。
+
+\begin{lstlisting}[language=cypher, caption={方块挖掘（无方向路径）}]
+-- 深积岩用什么工具挖
+MATCH path = (n:item:block)-[:TOOLMINEDROPS]-(tool:item)
+WHERE n.Name CONTAINS '深积岩'
+RETURN path LIMIT 10
+\end{lstlisting}
+
+\begin{lstlisting}[language=cypher, caption={生物掉落（无方向路径）}]
+-- 击败野人会掉落什么
+MATCH path = (n:item:monster)-[:DROPS]-(drop:item)
+WHERE n.Name CONTAINS '野人'
+RETURN path LIMIT 20
+\end{lstlisting}
+
+\begin{lstlisting}[language=cypher, caption={配方原料（无方向路径）}]
+-- 石剑的合成配方
+MATCH path = (product:item)-[:PRODUCES]-(r:recipe)-[:CONSUMES]-(material:item)
+WHERE product.Name CONTAINS '石剑'
+RETURN path LIMIT 20
+\end{lstlisting}
+
+\paragraph{（6）输出格式。}
+要求 LLM 返回 JSON，含 \texttt{cql} 与 \texttt{params} 字段。
+
+\subsection{部署与调参中的经验性说明（非对比实验结论）}
+
+在固定界面与第6章表~\ref{tab:nlq-category} 的走查之外，实现过程中曾观察：在本文数据上，优先 \texttt{RETURN path} 与无向关系有利于表格与力导向图同屏展示；多标签 \texttt{:item:block} 等较旧版桥接关系更短路径；\texttt{Name CONTAINS} 适合含复合名称的道具；\texttt{\$param} 与黑名单为工程上的注入与写操作防护。上述为经验性归纳，不写成与未建立基线或公开数据集的“测试表明”式客观评测。
