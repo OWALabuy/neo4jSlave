@@ -121,10 +121,15 @@ Knowledge graphs represent entities and relationships in a graph-structured form
 
 \begin{table}[H]
     \centering
-    \caption{与复现相关的主要环境变量（值由部署方填写，敏感项勿提交与勿写入论文）}
+    \captionsetup{justification=raggedright, singlelinecheck=false}
+    \caption[与复现相关的主要环境变量]{与复现相关的主要环境变量}
     \label{tab:env-repro}
+    \vspace{0.25\baselineskip}
+    \noindent{\zihao{5}\songti 表注：键值由部署方在本地或密钥管理环境中填写。敏感项不得随公开仓库传播，亦不得写入论文正文。}
+    \vspace{0.35\baselineskip}
     \small
-    \begin{tabular}{p{3.4cm}p{9.2cm}}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{>{\RaggedRight\arraybackslash}p{0.28\linewidth} >{\RaggedRight\arraybackslash}p{0.62\linewidth}}
         \toprule
         \textbf{变量} & \textbf{含义与说明} \\
         \midrule
@@ -839,11 +844,12 @@ WRITE_BLACKLIST = [
 
 \begin{table}[H]
     \centering
-    \caption{自动化测试与人工走查的分工与可外推范围}
+    \captionsetup{justification=centering, singlelinecheck=false}
+    \caption[自动化与人工走查测试分工表]{自动化测试与人工走查的分工与可外推范围}
     \label{tab:test-scope}
     \small
     \setlength{\tabcolsep}{4pt}
-    \begin{tabular}{p{1.6cm}p{5.2cm}p{5.2cm}}
+    \begin{tabular}{>{\RaggedRight\arraybackslash}p{0.12\linewidth} >{\RaggedRight\arraybackslash}p{0.4\linewidth} >{\RaggedRight\arraybackslash}p{0.4\linewidth}}
         \toprule
         & \textbf{自动化 \texttt{pytest}} & \textbf{人工 NLQ 走查} \\
         \midrule
@@ -856,14 +862,19 @@ WRITE_BLACKLIST = [
 
 \begin{table}[H]
     \centering
-    \caption{与表~\ref{tab:nlq-category} 对应之人工走查环境（\texttt{2026-04-06} 当次；重测请同步更新本表与统计表）}
+    \captionsetup{justification=centering, singlelinecheck=false}
+    \caption[人工走查环境配置表]{与表~\ref{tab:nlq-category} 对应之人工走查环境}
     \label{tab:eval-runtime}
+    \vspace{0.2\baselineskip}
+    \noindent{\zihao{5}\songti 表注：\texttt{2026-04-06} 当次；重测时请同步本表、表~\ref{tab:nlq-category} 及 \texttt{nlq\_eval\_protocol.md}。}
+    \vspace{0.3\baselineskip}
     \small
-    \begin{tabular}{p{2.4cm}p{10.2cm}}
+    \setlength{\tabcolsep}{5pt}
+    \begin{tabular}{>{\RaggedRight\arraybackslash}p{0.22\linewidth} >{\RaggedRight\arraybackslash}p{0.68\linewidth}}
         \toprule
         \textbf{项} & \textbf{内容} \\
         \midrule
-        评测日期 & 2026-04-06（与表~\ref{tab:nlq-category} 脚注一致时）。 \\
+        评测日期 & 2026-04-06（与表~\ref{tab:nlq-category} 表注一致时）。 \\
         \texttt{LLM\_API\_BASE} & 阿里云通义百炼 OpenAI 兼容端点，示例为 \url{https://dashscope.aliyuncs.com/compatible-mode/v1}；密钥只经环境注入。 \\
         \texttt{LLM\_MODEL} & \texttt{qwen-turbo}。 \\
         其它 & 后端请求体中 \texttt{temperature=0.1}；与 \texttt{nlq\_eval\_protocol.md} 中可登记字段（如 top\_p）同一口径。 \\
@@ -949,8 +960,12 @@ def test_basic_node_conversion(self, sample_records):
 
 \begin{table}[H]
     \centering
-    \caption{自然语言查询走查按类统计；判定协议与 21 条问句见 \texttt{doc/paper/nlq\_eval\_protocol.md}，运行环境见表~\ref{tab:eval-runtime}。}
+    \captionsetup{justification=centering, singlelinecheck=false}
+    \caption[自然语言走查按类统计]{自然语言查询走查按类统计}
     \label{tab:nlq-category}
+    \vspace{0.2\baselineskip}
+    \noindent{\zihao{5}\songti 表注：问句与判定见 \texttt{doc/paper/nlq\_eval\_protocol.md}，运行环境见表~\ref{tab:eval-runtime}。}
+    \vspace{0.3\baselineskip}
     \begin{tabular}{lccc}
         \toprule
         \textbf{查询类别} & \textbf{测试数} & \textbf{通过数} & \textbf{准确率} \\

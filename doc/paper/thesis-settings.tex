@@ -20,7 +20,9 @@
 \newcommand{\thesislogowidth}{15cm}
 
 % ----- 宏包 -----
+\usepackage{etoolbox}
 \usepackage{ctex}
+\usepackage{ragged2e}
 \usepackage{amsmath,amsfonts,amssymb}
 \usepackage{graphicx}
 \usepackage[subfigure]{tocloft}
@@ -91,8 +93,27 @@
   \noindent{\zihao{-4}\normalfont\bfseries Keywords:} \normalfont\zihao{-4}#1\par
 }
 
-% ----- 章节编号：\thesection 仅为数字，保证小节为 4.1 而非“第4章.1”；章题用“第 n 章”另写 -----
-\titleformat{\section}[block]{\centering\heiti\zihao{-2}}{第\arabic{section}章}{0.5em}{}
+% ----- 附录：\appendix 后 \thesection 为 A,B,…，但 \arabic{section} 从 1 重计，第\arabic{section}章 会误成“第1章” -----
+\newif\ifthesisappendix
+\thesisappendixfalse
+% 在 article 中于 \appendix 之后将目录中“章”条前缀从「第/章」改为「附录/空」，以得到「附录A」而非「第A章」
+\apptocmd\appendix{%
+  \thesisappendixtrue
+  \addtocontents{toc}{%
+    \protect\renewcommand\protect\cftsecpresnum{附录}%
+    \protect\renewcommand\protect\cftsecaftersnum{}%
+    \protect\setlength\protect\cftsecnumwidth{3.2em}%
+  }%
+}{}{}
+
+% ----- 章节编号：正文用“第 n 章”；\appendix 后节标题用“附录 A”（与目录一致，不含“章”字，避免 第A章 怪形）-----
+\titleformat{\section}[block]{\centering\heiti\zihao{-2}}{%
+  \ifthesisappendix
+    附录\thesection\quad
+  \else
+    第\arabic{section}章\quad
+  \fi
+}{0.5em}{}
 \titleformat{\subsection}[hang]{\heiti\zihao{-3}}{\thesubsection}{0.5em}{}
 \titleformat{\subsubsection}[hang]{\heiti\zihao{4}}{\thesubsubsection}{0.5em}{}
 \titlespacing*{\section}{0pt}{1.5ex plus 0.3ex minus 0.2ex}{0.8ex plus 0.2ex}
@@ -102,8 +123,11 @@
 % ----- 图、表按章编号：图 1-1、表 1-1；题注黑体五号 -----
 \counterwithin{figure}{section}
 \counterwithin{table}{section}
-\renewcommand{\thefigure}{\arabic{section}-\arabic{figure}}
-\renewcommand{\thetable}{\arabic{section}-\arabic{table}}
+% 正文为「章号-表号」；\appendix 后章号为 A、B，故用 \thesection
+\renewcommand{\thefigure}{%
+  \ifthesisappendix\thesection\else\arabic{section}\fi-\arabic{figure}}
+\renewcommand{\thetable}{%
+  \ifthesisappendix\thesection\else\arabic{section}\fi-\arabic{table}}
 \renewcommand{\figurename}{图}
 \renewcommand{\tablename}{表}
 % 图题、表题：黑体五号（10.5pt）
@@ -134,8 +158,16 @@
   morestring=[b]",
   morecomment=[l]{//},
 }
+% 代码块等宽：Monaspace Radon（fontconfig 中须用 “Regular” 等全名；勿用 “Monaspace Radon” 会解析失败。无字体时改 basicstyle 为 \small\ttfamily 并删除本 \newfontfamily。）
+\newfontfamily\ThesisListingsBase{Monaspace Radon}[
+  UprightFont     = {Monaspace Radon Regular},
+  ItalicFont      = {Monaspace Radon Italic},
+  BoldFont        = {Monaspace Radon Bold},
+  BoldItalicFont  = {Monaspace Radon Bold Italic},
+  Scale = 0.90
+]
 \lstset{
-  basicstyle=\small\ttfamily,
+  basicstyle={\ThesisListingsBase\small},
   breaklines=true,
   frame=single,
   backgroundcolor=\color{gray!10},
