@@ -8,12 +8,12 @@
 
 | 项目 | 填写 |
 |------|------|
-| 评测日期 |26-04-06|
-| `LLM_API_BASE` | （域名即可，勿写密钥） |
-| `LLM_MODEL` | |
-| 温度 / 其它采样参数 | |
-| Neo4j 数据批次 / commit | |
-| 后端 commit | `git rev-parse --short HEAD` |
+| 评测日期 | 如 2026-04-06 |
+| `LLM_API_BASE` | 可写公开 HTTPS 基址，如 `https://dashscope.aliyuncs.com/compatible-mode/v1`；**勿**写密钥 |
+| `LLM_MODEL` | 如 `qwen-turbo`；与论文表 6 人工走查环境表一致时便于核对 |
+| 温度 / 其它采样参数 | 如后端 `temperature=0.1`；以实际请求为准 |
+| Neo4j 数据批次 / commit | 与第4章数据一致；或记录 dump/导入脚本版本 |
+| 后端 commit | `git rev-parse --short HEAD`（公开仓库 `https://github.com/OWALabuy/neo4jSlave`） |
 
 ## 2. “通过”判定标准
 

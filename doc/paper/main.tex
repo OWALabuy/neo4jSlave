@@ -15,7 +15,7 @@
 \phantomsection
 \addcontentsline{toc}{section}{摘要}
 \begin{abstract}
-    知识图谱以图结构表示实体与关系，在知识管理、智能问答与推荐等任务中应用较广。基于 Cypher 等形式化语言的图查询对不具备查询语言基础的用户有学习成本。本研究在浏览器/服务器结构下设计并实现系统 neo4jSlave：前端中文提问，FastAPI 自 Neo4j 读取图结构摘要并与问句一并送入大语言模型，得到参数化只读 Cypher；经应用层只读与参数规则校验后执行，结果以表格与 ECharts 点边图呈现，连接与端点可经环境变量配置。验证上，配套自动化测试 38 条，覆盖语句校验、记录到图谱结构转换与对外 API 契约，全部通过，其中对 \texttt{/nlq} 的自动化路径对大语言模型端使用 Mock，故不测真实自然语言语义。自然语言部分另在固定协议下以 21 条中文问句作人工走查，协议见 \texttt{doc/paper/nlq\_eval\_protocol.md}，可接受结果比例约 81.0\%（第6章按类统计表），表达复杂或歧义时仍可能错答与漏答。与公开 Text2Cypher 基准竞赛相比，本研究侧重可部署的 HTTP 全链路与可复现配置，未将训练新模型或刷新公开榜单作为主要目标。
+    知识图谱以图结构表示实体与关系，在知识管理、智能问答与推荐等任务中应用较广。基于 Cypher 等形式化语言的图查询对不具备查询语言基础的用户有学习成本。本研究在浏览器/服务器结构下设计并实现系统 neo4jSlave：前端中文提问，FastAPI 自 Neo4j 读取图结构摘要并与问句一并送入大语言模型，得到参数化只读 Cypher；经应用层只读与参数规则校验后执行，结果以表格与 ECharts 点边图呈现，连接与端点可经环境变量配置。验证上，配套自动化测试 38 条，覆盖语句校验、记录到图谱结构转换与对外 API 契约，全部通过，其中对 \texttt{/nlq} 的自动化路径对大语言模型端使用 Mock，故不测真实自然语言语义。自然语言部分另在固定协议下以 21 条中文问句作人工走查，协议见 \texttt{doc/paper/nlq\_eval\_protocol.md}，可接受结果比例约 81.0\%（第6章按类统计表），表达复杂或歧义时仍可能错答与漏答。与公开 Text2Cypher 基准竞赛相比，本研究侧重可部署的 HTTP 全链路与可复现配置，未将训练新模型或刷新公开榜单作为主要目标。可复现所涉公开仓库、路径约定与环境变量表见第2章。
 \end{abstract}
 
 \begin{thesiskeywords}
@@ -27,7 +27,7 @@
 \phantomsection
 \addcontentsline{toc}{section}{Abstract}
 \begin{thesisabstracten}
-Knowledge graphs represent entities and relationships in a graph-structured form and are widely used in information systems. Property-graph query languages such as Cypher are difficult for end users who lack dedicated training. This work presents a browser--server system (neo4jSlave): users type Chinese questions; a FastAPI backend fetches a schema summary from Neo4j, forwards it with the question to a large language model, and receives parameterized read-only Cypher, which is validated for read safety and parameters before execution; results are returned as tables and ECharts node--link views. Connection strings and service endpoints are configurable by environment variables. The accompanying test suite has 38 \texttt{pytest} cases, covering the validator, graph JSON conversion, and public API behavior; the suite passes, with the \texttt{/nlq} path mocking the LLM, so it does not measure end-to-end semantic accuracy. For natural language quality, a set of 21 questions was evaluated in a one-off walk-through with a fixed protocol in \texttt{doc/paper/nlq\_eval\_protocol.md}; about 81.0\% were deemed acceptable in aggregate (tabulated by category in Chapter~6), with known failures on complex and ambiguous phrasing. The emphasis is a deployable HTTP path and replicable configuration rather than training a new model or a leaderboard submission for Text2Cypher benchmarks.
+Knowledge graphs represent entities and relationships in a graph-structured form and are widely used in information systems. Property-graph query languages such as Cypher are difficult for end users who lack dedicated training. This work presents a browser--server system (neo4jSlave): users type Chinese questions; a FastAPI backend fetches a schema summary from Neo4j, forwards it with the question to a large language model, and receives parameterized read-only Cypher, which is validated for read safety and parameters before execution; results are returned as tables and ECharts node--link views. Connection strings and service endpoints are configurable by environment variables. The accompanying test suite has 38 \texttt{pytest} cases, covering the validator, graph JSON conversion, and public API behavior; the suite passes, with the \texttt{/nlq} path mocking the LLM, so it does not measure end-to-end semantic accuracy. For natural language quality, a set of 21 questions was evaluated in a one-off walk-through with a fixed protocol in \texttt{doc/paper/nlq\_eval\_protocol.md}; about 81.0\% were deemed acceptable in aggregate (tabulated by category in Chapter~6), with known failures on complex and ambiguous phrasing. The emphasis is a deployable HTTP path and replicable configuration rather than training a new model or a leaderboard submission for Text2Cypher benchmarks. A public source repository, relative-path convention, and environment table are in Chapter~2.
 \end{thesisabstracten}
 \thesiskeywordsen{Knowledge Graph; Natural Language Processing; Cypher Query; Neo4j; Large Language Model; Data Visualization; FastAPI}
 
@@ -50,7 +50,7 @@ Knowledge graphs represent entities and relationships in a graph-structured form
 
 知识图谱以有向图的方式表示实体为顶点、关系为边，可附带顶点和边上的属性，用来回答“与某实体相连的另一类实体是什么、沿怎样的路径连起来”等问题；这类表达在信息检索、推荐、金融风控、生物信息等领域已被广泛接受。工程上，领域数据常被整理成图数据库中的可查询图；其中较常见的一种抽象称为属性图（Property Graph），即把实体与关系都看成可带键值对属性的“对象”，用声明式图查询语言描述模式匹配与路径。与之并列的另一类路线是资源描述框架（RDF, Resource Description Framework）及其配套查询语言 SPARQL：RDF 把知识写成大量“主语—谓语—宾语”的三元组，擅长开放数据互联与规范化的语义网场景；属性图则更贴近面向工程实现的存储与产品迭代。二者并无绝对优劣，取舍取决于数据形态、团队熟悉度与是否已有现成图实例。
 
-在此基础上，Neo4j 是常用的开源属性图数据库之一，其官方查询语言为 Cypher。Cypher 属于形式化查询语言：使用者需要了解标签、关系类型、（可选的）多跳路径等概念。因此，对许多希望“用日常语言提一句、就看到关系图”的终端用户而言，直接手工编写 Cypher 的学习成本仍然偏高。近年在大语言模型（LLM, Large Language Model）推动下，以自然语言生成可执行 SQL、Cypher 等结构化查询已成为可部署的技术路线之一。在已有工作基础上，本研究为以属性图组织、以中文描述为主的领域数据，实现可说明依赖与可复现运行的 B/S（Browser/Server）服务；环境与接口约定见本论文、仓库 \texttt{README} 与 \texttt{.env.example}。
+在此基础上，Neo4j 是常用的开源属性图数据库之一，其官方查询语言为 Cypher。Cypher 属于形式化查询语言：使用者需要了解标签、关系类型、（可选的）多跳路径等概念。因此，对许多希望“用日常语言提一句、就看到关系图”的终端用户而言，直接手工编写 Cypher 的学习成本仍然偏高。近年在大语言模型（LLM, Large Language Model）推动下，以自然语言生成可执行 SQL、Cypher 等结构化查询已成为可部署的技术路线之一。在已有工作基础上，本研究为以属性图组织、以中文描述为主的领域数据，实现可说明依赖与可复现运行的 B/S（Browser/Server）服务；可复现依赖、公开仓库地址与路径约定见第2章。
 
 下面对知识图谱的建模与查询、自然语言到图查询的既有工作，以及大语言模型与知识图谱的协同作归纳，以便与后文第2章起的技术选型和实现一一对照\cite{ref6,ref7,ref8,ref12,ref13,ref14,ref15}。现有文献与产品通常分别回答“图如何建”“自然语言到 Cypher 的模型指标如何”，缺口一：在既定属性图与中文问句下，可交予他人依文档在本地起服务的“问句—受约束 Cypher—表格与关系图”闭环往往不成整体；本研究的对象即实现上述闭环，并在第2--6 章自环境、需求、设计、实现到测试与统计表可核对。
 
@@ -104,15 +104,40 @@ Knowledge graphs represent entities and relationships in a graph-structured form
 
 \subsection{论文组织结构与复现线索}
 
-第3章为可行性、需求与性能，划定边界；第4章为总体架构、模块与数据库；第5章为四模块设计与实现；第6章为测试与统计。复现时优先第2、5两章，并配合 \texttt{README.md}、\texttt{.env.example} 与测试目录。
+第3章为可行性、需求与性能，划定边界；第4章为总体架构、模块与数据库；第5章为四模块设计与实现；第6章为测试与统计。复现时优先第2、5两章，并配合 \texttt{README}、\texttt{.env.example} 与 \texttt{tests/}；公开源码地址与路径约定见\ref{subsec:repo-and-paths}~节，环境变量表见\ref{tab:env-repro}。
 
 \newpage
 
 \section{系统开发环境与技术选型}
 
-\subsection{开发环境}
+\subsection{开发环境、公开仓库与路径约定}
+\label{subsec:repo-and-paths}
 
 本系统在 GNU/Linux 环境下开发与调试（例如 Ubuntu 22.04 LTS、Debian 12）。宿主机需安装可运行的 Neo4j 实例，既可使用本机服务（如 \texttt{bolt://127.0.0.1:7687}），也可连接局域网或云主机上的远程实例（如 \texttt{bolt://10.x.x.x:7687}）。浏览器建议使用近两年的主流版本（如 Chrome 120+、Edge 120+、Firefox 120+），以保证前端图形交互稳定。后端使用 Python 3.10 及以上版本，并通过虚拟环境管理第三方依赖（如使用 \texttt{python -m venv .venv} 创建环境，配合 \texttt{pip install -r requirements.txt} 安装 \texttt{fastapi}、\texttt{neo4j}、\texttt{httpx}、\texttt{pytest} 等包），以避免与系统 Python 冲突。前端不依赖 Node 构建链，采用原生 HTML/CSS/JavaScript，便于课程与答辩现场快速演示。版本控制使用 Git；日常编辑可使用任意编辑器（如 Vim、VS Code 等）。上述选择的目标是：环境可描述、依赖可列举、在常见 Linux 发行版上可重复搭建，从而降低他人复现时的不确定因素。
+
+与本文写作材料对应的公开源代码托管于 GitHub：\url{https://github.com/OWALabuy/neo4jSlave}。仅阅读印刷版或 PDF 的读者可据此在浏览器中打开对应路径。后文及附录中出现的 \texttt{doc/paper/}、\texttt{tests/}、\texttt{backend/} 等，均指在克隆或解压该仓库后、以仓库根目录为当前工作目录时的相对路径，而非作者本机绝对路径。部署与人工评测所依赖的敏感项（如数据库密码、\texttt{LLM\_API\_KEY}）不得写入论文正文或随仓库公开，应以环境变量或本地 \texttt{.env} 注入；仓库中提供 \texttt{.env.example} 作为键名说明（与表~\ref{tab:env-repro} 一致，不含有效密钥）。
+
+主环境变量与含义概括见表~\ref{tab:env-repro}；具体键名以仓库根目录 \texttt{.env.example} 为准。
+
+\begin{table}[H]
+    \centering
+    \caption{与复现相关的主要环境变量（值由部署方填写，敏感项勿提交与勿写入论文）}
+    \label{tab:env-repro}
+    \small
+    \begin{tabular}{p{3.4cm}p{9.2cm}}
+        \toprule
+        \textbf{变量} & \textbf{含义与说明} \\
+        \midrule
+        \texttt{NEO4J\_URI} & Bolt 端点，如本机 \texttt{bolt://127.0.0.1:7687} 或部署文档给出的地址。 \\
+        \texttt{NEO4J\_USER} / \texttt{NEO4J\_PASSWORD} & 与 Neo4j 实例配置一致；密码仅本地保存。 \\
+        \texttt{NEO4J\_DATABASE} & 如 \texttt{neo4j}，与第4章导入数据所在库名一致。 \\
+        \texttt{LLM\_API\_BASE} & OpenAI 风格 Chat Completions 的 HTTPS 基址；本论文人工走查见表~\ref{tab:eval-runtime}。 \\
+        \texttt{LLM\_API\_KEY} & 由云厂商发放；经环境注入，不得出现在论文与公开 diff 中。 \\
+        \texttt{LLM\_MODEL} & 如 \texttt{qwen-turbo}；更换模型后表~\ref{tab:nlq-category} 中比例应重测。 \\
+        \texttt{ENABLE\_EXPLAIN\_VALIDATE} & 如 \texttt{false} 时与本文默认安全与测试路径一致。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 \subsection{技术路线与第1章问题的对应关系}
 
@@ -795,9 +820,9 @@ WRITE_BLACKLIST = [
 ]
 \end{lstlisting}
 
-除上述关键字拦截外，系统未对 \texttt{CALL} 自定义过程（如APOC插件）做白名单约束；在不可信网络环境下部署时，应优先使用Neo4j只读账号或只读副本，并将服务置于内网或网关之后。
+除上述关键字拦截外，系统未对 \texttt{CALL} 自定义过程（如 APOC 等插件过程）做白名单约束。部署假设为：图库以只读账号或只读副本访问、服务置于内网或经反向代理与鉴权后暴露，从而将可执行 Cypher 的攻击面与误用面限制在可信主体内；在不可信网络下若须开放，应另加网关层策略或扩展校验。
 
-参数校验（实现说明）。使用正则表达式提取 Cypher 中的参数占位符 \texttt{\$param}，与请求体提供的参数对比，确保必需参数齐全（\texttt{/run-cql} 与 \texttt{/nlq} 共用逻辑，实现见仓库路由层）。
+参数校验（实现说明）。使用正则表达式提取 Cypher 中的参数占位符 \texttt{\$param}，与请求体提供的参数对比，确保必需参数齐全（\texttt{/run-cql} 与 \texttt{/nlq} 共用逻辑，实现见源码树 \texttt{backend/app/} 下路由，路径以第\ref{subsec:repo-and-paths}~节为准）。
 
 \subsection{本章小结}
 
@@ -808,9 +833,47 @@ WRITE_BLACKLIST = [
 \section{系统测试}
 \subsection{测试目的与方法}
 
-系统测试的目的是验证系统的功能正确性、安全性和稳定性。测试方法分为两类：一是基于 \texttt{pytest} 的自动化测试（单元测试与接口契约测试）；二是对自然语言端到端效果的人工用例评测。
+系统测试的目的是验证系统的功能正确性、安全性和稳定性。测试方法分为两类：一是基于 \texttt{pytest} 的自动化测试（单元测试与接口契约测试）；二是对自然语言端到端效果的人工用例评测。两类方式的分工、局限与可外推范围见表~\ref{tab:test-scope}，避免将“接口全绿”与“自然语言全程正确”混读。
 
-说明：pytest中的38个用例主要对Cypher校验、图数据转换与API契约做自动化验证；其中\texttt{/nlq}相关用例对LLM进行Mock，不度量真实自然语言准确率。表~\ref{tab:nlq-category}所述21条为人工逐条记录通过/失败的评测，二者不应混为一谈。
+与表~\ref{tab:nlq-category} 对应之人工走查的当时运行环境见表~\ref{tab:eval-runtime}；更换 LLM 端点、模型名、温度或图数据版本后，应重跑并更新第6章统计表。自动化用例的件数（当前为 38 条）以在仓库根目录执行 \texttt{python -m pytest tests/ --collect-only -q} 的收集结果为准，随用例增删而变；论文中若写死条数，宜与所附提交或标签下收集结果校核。
+
+\begin{table}[H]
+    \centering
+    \caption{自动化测试与人工走查的分工与可外推范围}
+    \label{tab:test-scope}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{p{1.6cm}p{5.2cm}p{5.2cm}}
+        \toprule
+        & \textbf{自动化 \texttt{pytest}} & \textbf{人工 NLQ 走查} \\
+        \midrule
+        主要覆盖 & \texttt{tests/test\_cql\_validator.py}：只读/黑名单/EXPLAIN 关断路径等；\texttt{tests/test\_api.py}：\texttt{/health}、\texttt{/schema}、\texttt{/run-cql}、\texttt{/nlq} 在 Mock 下的状态码与 JSON 契约；\texttt{tests/test\_echarts\_converter.py}：\texttt{records\_to\_graph} 等结构。 & 协议 \texttt{doc/paper/nlq\_eval\_protocol.md} 中 21 问句、通过判据、日期与端点/模型记录；在真实 Neo4j 与真实大模型下执行。 \\
+        不覆盖 & 不连接真实 Neo4j；\texttt{/nlq} 对 LLM 使用 Mock，不测自然语言语义与真实延迟。 & 非多模型、非盲法对照；不单独构成公开基准榜排名。 \\
+        可外推性 & 在相同代码版本上可复现接口与拦截行为、转换器 fixture 上性质。 & 比例与类别统计仅在表~\ref{tab:eval-runtime} 所钉环境、数据批次与协议下成立。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \caption{与表~\ref{tab:nlq-category} 对应之人工走查环境（\texttt{2026-04-06} 当次；重测请同步更新本表与统计表）}
+    \label{tab:eval-runtime}
+    \small
+    \begin{tabular}{p{2.4cm}p{10.2cm}}
+        \toprule
+        \textbf{项} & \textbf{内容} \\
+        \midrule
+        评测日期 & 2026-04-06（与表~\ref{tab:nlq-category} 脚注一致时）。 \\
+        \texttt{LLM\_API\_BASE} & 阿里云通义百炼 OpenAI 兼容端点，示例为 \url{https://dashscope.aliyuncs.com/compatible-mode/v1}；密钥只经环境注入。 \\
+        \texttt{LLM\_MODEL} & \texttt{qwen-turbo}。 \\
+        其它 & 后端请求体中 \texttt{temperature=0.1}；与 \texttt{nlq\_eval\_protocol.md} 中可登记字段（如 top\_p）同一口径。 \\
+        Neo4j & 多标签图数据同第4章；\texttt{NEO4J\_*} 见表~\ref{tab:env-repro}。 \\
+        代码与数据 & 以当时 \texttt{git rev-parse --short HEAD} 在\url{https://github.com/OWALabuy/neo4jSlave} 的提交为参照；图数据以导入脚本或导出版本号为准。 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+说明：\texttt{pytest} 中当前 38 个用例对 Cypher 校验、图数据转换与 API 契约做自动化验证；其中 \texttt{/nlq} 相关用例对 LLM 进行 Mock，不度量真实自然语言准确率。表~\ref{tab:nlq-category} 所述 21 条为人工逐条通过/未通过记录，与自动化不应混读。
 
 为与第5章实现保持同一口径，本章按四个核心模块组织测试：
 \begin{itemize}
@@ -886,7 +949,7 @@ def test_basic_node_conversion(self, sample_records):
 
 \begin{table}[H]
     \centering
-    \caption{自然语言查询准确率测试（按类别统计）}
+    \caption{自然语言查询走查按类统计；判定协议与 21 条问句见 \texttt{doc/paper/nlq\_eval\_protocol.md}，运行环境见表~\ref{tab:eval-runtime}。}
     \label{tab:nlq-category}
     \begin{tabular}{lccc}
         \toprule
@@ -905,8 +968,7 @@ def test_basic_node_conversion(self, sample_records):
         \bottomrule
     \end{tabular}
 \end{table}
-
-% 注：上表为2026年4月6日按 \texttt{doc/paper/nlq\_eval\_protocol.md} 中问句实测汇总；若更换模型或问句，应重新统计并替换本表。
+{\small 注：本表为 2026-04-06 按协议问句实测汇总；更换表~\ref{tab:eval-runtime} 中任一项后应重测并重填。}
 
 多标签架构效果分析：
 
@@ -937,8 +999,9 @@ def test_basic_node_conversion(self, sample_records):
         \bottomrule
     \end{tabular}
 \end{table}
+{\small 注：``旧架构''列来自迁移至当前多标签 Neo4j 之前、对第4章所述 GDB/桥接式建模范式的走查或开发笔记中汇总的回溯性比例，问句与表~\ref{tab:nlq-category} 中同类在语义上尽量对齐，但不是与表~\ref{tab:nlq-category} 同一次控制实验的配对对照，不宜作假设检验；``新架构''列中各类与表~\ref{tab:nlq-category} 同行一致，总体平均为按类算数平均。本表仅供工程迁移前后直观对照。}
 
-测试结果表明，多标签架构在道具、生物与配方链路上显著优于旧版桥接方案；方块与分组类问句仍受自然语言歧义与属性键语义影响，需结合 Prompt 持续细化。
+多标签架构在道具、生物与配方链路上的走查效果优于该旧版建模范式；方块与分组类问句仍受自然语言歧义与属性键语义影响，需结合 Prompt 持续细化。
 
 典型测试用例如表~\ref{tab:nlq-cases}所示。
 
