@@ -718,11 +718,13 @@ WRITE_BLACKLIST = [
 
 \subsection{测试目的与方法}
 
-本章验证实现后的两类问题：接口、安全校验与结果转换是否按约定运行；在既定领域图数据上，真实中文问句经自然语言链路能否得到可接受结果。
+本章回答两类验证问题：其一，接口契约、安全校验与结果转换是否在程序层面按约定运行；其二，在既定领域图数据上，真实中文问句经自然语言链路能否得到评判者可接受的结果。
 
-系统测试分为自动化测试与人工走查两类。自动化测试基于 \texttt{pytest}，主要验证接口契约、只读校验、参数检查和图数据转换等稳定逻辑。人工走查在固定模型、固定图数据和固定判定协议下进行，用于观察自然语言问句经大语言模型生成 Cypher 后的端到端效果。两类测试回答的问题不同：前者说明程序行为是否符合实现约定，后者说明自然语言入口在当前配置下的可用程度。二者的分工、局限与可外推范围见表~\ref{tab:test-scope}。
+系统测试分为自动化测试与人工走查。自动化测试使用 Python 测试框架 \texttt{pytest}，通过脚本调用后端路由并断言 HTTP 状态码与响应 JSON 是否与实现一致（下文统称接口契约）；覆盖只读黑名单、参数占位符一致性以及 Neo4j 返回记录到前端图结构的转换等逻辑。其中自然语言接口 \texttt{/nlq} 在自动化中对大语言模型的调用替换为预先设定的假返回（Mock），以避免评测依赖云端配额并保证多次运行结果可比对。人工走查则在固定模型、固定图数据与书面判定协议下进行：评判者逐条核对生成语句与查询结果是否满足协议中的通过条件，度量的是端到端可用性，而非某一函数的单元隔离测试。
 
-与表~\ref{tab:nlq-category} 对应的人工走查环境见表~\ref{tab:eval-runtime}。更换 LLM 端点、模型名、温度或图数据版本后，应重新执行走查并更新统计表。自动化用例的件数以仓库当前版本的 \texttt{pytest} 收集结果为准；本文所列 38 条对应本次提交时的测试规模。
+两类测试回答的问题不同：自动化测试说明代码行为是否与仓库内约定一致；人工走查说明在当前模型与数据版本下自然语言入口的实际可用程度。分工、局限与可外推范围见表~\ref{tab:test-scope}。
+
+与表~\ref{tab:nlq-category} 对应的人工走查环境与采样参数见表~\ref{tab:eval-runtime}。更换大语言模型服务端点、模型名、采样温度（temperature，控制生成结果的随机程度）或图数据导入版本后，应重新执行走查并重填统计表。自动化用例件数以仓库当前 \texttt{pytest} 收集结果为准；本文所写 38 条对应撰写时的提交版本。
 
 \begin{table}[H]
     \centering
@@ -763,20 +765,18 @@ WRITE_BLACKLIST = [
     \end{tabular}
 \end{table}
 
-说明：\texttt{pytest} 中当前 38 个用例对 Cypher 校验、图数据转换与 API 契约做自动化验证；其中 \texttt{/nlq} 相关用例对 LLM 进行 Mock，故不度量真实自然语言语义正确率。表~\ref{tab:nlq-category} 所述 21 条为人工走查记录，其结论仅在表~\ref{tab:eval-runtime} 所列环境下成立。
+说明：自动化测试当前共 38 个用例，覆盖 Cypher 校验、图数据转换与 API 契约；其中 \texttt{/nlq} 相关用例对 LLM 使用 Mock，故自动化套件不度量真实自然语言语义正确率。表~\ref{tab:nlq-category} 所述 21 条为人工走查记录，结论仅在表~\ref{tab:eval-runtime} 所列环境下成立。
 
-本章测试编排与详细设计与实现章的四个核心模块一致：自然语言查询（含端到端效果）、图数据访问与 Cypher 执行（\texttt{/health}、\texttt{/schema}、\texttt{/run-cql} 等契约）、结果转换与可视化（\texttt{records\_to\_graph} 及界面）、安全与约束（只读黑名单与参数校验）。
+本章测试编排与第~\ref{sec:detailed-implementation}~章的四个核心模块一致：自然语言查询（含端到端效果）、图数据访问与 Cypher 执行（\texttt{/health}、\texttt{/schema}、\texttt{/run-cql} 等契约）、结果转换与可视化（\texttt{records\_to\_graph} 及界面）、安全与约束（只读黑名单与参数校验）。
 
-\textbf{pytest 自动化测试过程与样例断言。}
-
-本节说明自动化测试的执行步骤，并摘抄仓库 \texttt{tests/} 中与表~\ref{tab:readonly-test}、表~\ref{tab:api-test} 及图数据转换逻辑对应的断言代码。
+以下给出自动化测试的环境与命令，并摘录仓库 \texttt{tests/} 中与表~\ref{tab:readonly-test}、表~\ref{tab:api-test} 及图数据转换逻辑相对应的断言代码。
 
 \paragraph{环境与命令}
 在仓库根目录安装依赖（参见 \texttt{README.md}）后，于终端执行：
 \begin{verbatim}
 python -m pytest tests/ -v
 \end{verbatim}
-\texttt{tests/conftest.py} 将 \texttt{backend/} 加入 \texttt{sys.path}，测试用例可直接 \texttt{import app.*}；API 测试通过 \texttt{FastAPI TestClient} 与 \texttt{unittest.mock.patch} 模拟 Neo4j、LLM 等外部依赖，无需启动真实 Neo4j 即可验证路由与安全策略。
+\texttt{tests/conftest.py} 将后端源码目录加入 Python 模块搜索路径（\texttt{sys.path}），使测试代码可直接加载应用对象；API 测试使用 FastAPI 提供的内存客户端（TestClient）构造请求并读取响应，无需启动浏览器或监听真实网络端口。Neo4j、大语言模型等外部依赖通过 \texttt{unittest.mock.patch} 在测试运行时替换为假对象，从而在离线条件下验证路由与安全策略仍能按约定分支执行。
 
 \paragraph{样例断言 A：只读校验器（摘录）}
 下列断言分别对应“合法只读通过”与“写操作被拦截”：
@@ -827,11 +827,11 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsection{分模块测试}
 
-承接上文统一测试方法与样例断言，本节按四个实现模块分别给出测试结果，使测试对象与实现对象一一对应。
+本节按第~\ref{sec:detailed-implementation}~章的四个实现模块分别汇总测试结果，使测试对象与模块边界一致。
 
 \subsubsection{自然语言查询模块测试}
 
-本小节评估大语言模型参与时的自然语言查询效果。评估对象是协议内 21 条中文问句，问句按 8 类整理，并在表~\ref{tab:eval-runtime} 所列环境下逐条判定是否可接受。该统计用于说明当前系统在本文领域图数据上的端到端表现，不作为公开题集或多模型横向排名。典型问句见表~\ref{tab:nlq-cases}。
+本小节评估大语言模型参与时的自然语言查询效果。评估对象为协议内 21 条中文问句，按 8 类整理；在表~\ref{tab:eval-runtime} 所列环境下由评判者逐条判定是否可接受。表~\ref{tab:nlq-category} 中``准确率''列指各类别内被判为通过的问句数占该类问句总数的比例；``总计''行为全部 21 条的通过比例（81.0\%）。该统计用于说明当前系统在本文领域图数据上的端到端表现，不作为公开题集或多模型横向排名。典型问句见表~\ref{tab:nlq-cases}。
 
 % 问句原文、所用模型及“通过”判定细则见仓库 \texttt{doc/paper/nlq\_eval\_protocol.md}，便于答辩复现与增补。
 
@@ -906,7 +906,7 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsubsection{安全与约束模块测试}
 
-本模块测试写操作和危险调用能否被正确拦截，测试用例如表~\ref{tab:readonly-test}所示。相关实现集中在 \texttt{cql\_validator}。
+本模块验证应用层只读校验能否拦截写入类关键字与高危形态：输入为 Cypher 字符串，预期为``允许执行''或``拒绝并给出原因''。测试用例与自动化断言对应关系见表~\ref{tab:readonly-test}；实现集中在 \texttt{cql\_validator}。
 
 \begin{table}[H]
     \centering
@@ -933,7 +933,7 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsubsection{图数据访问与Cypher执行模块测试}
 
-本模块测试各 API 端点的基本响应与错误路径，测试用例如表~\ref{tab:api-test}所示：
+本模块验证各 HTTP 端点在正常输入与异常输入下的响应：例如健康检查返回约定字段、不安全或参数缺失时返回可区分的 HTTP 状态码与错误信息。测试场景与预期见表~\ref{tab:api-test}。
 
 \begin{table}[H]
     \centering
@@ -957,11 +957,11 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsubsection{结果转换与可视化模块测试}
 
-结果转换模块通过 \texttt{tests/test\_echarts\_converter.py} 验证 Neo4j 记录到 \texttt{nodes}/\texttt{links} 的结构完整性（见上文样例断言 C）；同时在接口联调与前端运行中确认转换结果可被页面正确渲染，界面效果见图~\ref{fig:webui}，自然语言端到端可视化结果见图~\ref{fig:screenshot-nlq}。该模块的测试重点不是“图是否美观”，而是节点去重、边端点映射、类别与属性字段是否一致且可被前端消费。
+结果转换模块以 \texttt{tests/test\_echarts\_converter.py} 为主，验证 Neo4j 驱动返回的记录经 \texttt{records\_to\_graph} 等函数后，能否形成字段完备的 \texttt{nodes}/\texttt{links}（见上文样例断言 C）。接口联调与前端运行中进一步确认同一 JSON 可被页面解析并绘图：界面总览见图~\ref{fig:webui}，自然语言端到端结果见图~\ref{fig:screenshot-nlq}。评判重点不在图形审美，而在于节点去重、边端点与类别字段是否与后端约定一致并可被浏览器端脚本消费。
 
 \subsection{测试结果汇总}
 
-经测试，系统 38 个 \texttt{pytest} 用例全部通过，API、参数校验、只读黑名单和结果转换行为符合预期。自然语言端到端走查在固定环境下取得 81.0\% 的可接受比例，分项结果见表~\ref{tab:nlq-category}。
+自动化层面：38 个 \texttt{pytest} 用例全部通过，API、参数校验、只读黑名单与结果转换行为与仓库内断言一致。自然语言层面：在表~\ref{tab:eval-runtime} 固定环境与协议下，21 条问句中 17 条被判为可接受（81.0\%），分项见表~\ref{tab:nlq-category}；该比例不可直接外推到其它模型、其它数据集或未采用同一判定协议的情形。
 
 \begin{thesisconclusion}
 
