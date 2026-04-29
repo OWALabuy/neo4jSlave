@@ -4,7 +4,7 @@
 
 本附录给出自然语言提示词的分块结构与少样本示例全文，便于读者对照实现与答辩演示。内容与仓库根目录下 \texttt{backend/app/system\_prompt.txt} 及第~\ref{sec:detailed-implementation}~章第~\ref{subsec:nlq-impl}~节叙述对应；若正文、附录与仓库文件三者存在出入，以仓库当前版本为准。
 
-\subsection{提示词分块（与第~\ref{subsec:nlq-impl}~节概括对应）}
+\subsection{提示词分块}
 
 \paragraph{（1）角色定义。}
 首先明确由大语言模型（Large Language Model, LLM）在只读前提下生成 Cypher，禁止写操作。
@@ -55,6 +55,6 @@ RETURN path LIMIT 20
 \paragraph{（6）输出格式。}
 要求大语言模型返回 JSON，含 \texttt{cql} 与 \texttt{params} 字段。
 
-\subsection{部署与调参中的经验性说明（非对比实验结论）}
+\subsection{部署与调参中的经验性说明}
 
 在固定界面与表~\ref{tab:nlq-category} 所列人工走查（第~\ref{sec:system-test}~章）之外，实现过程中曾观察：在本文数据上，优先 \texttt{RETURN path} 与无向关系有利于表格与力导向图同屏展示；多标签 \texttt{:item:block} 等较旧版桥接关系路径更短；\texttt{Name CONTAINS} 适合含复合名称的道具；\texttt{\$param} 与黑名单为工程上的注入与写操作防护。上述为经验性归纳，不构成与未建立基线或公开数据集对比的客观评测结论。
