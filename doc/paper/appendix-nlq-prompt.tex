@@ -2,20 +2,21 @@
 \section{自然语言提示词与调试说明补遗}
 \label{app:prompt-supplement}
 
-本附录给出自然语言提示词的分块结构与少样本示例全文，便于读者对照实现与答辩演示。内容与仓库根目录下 \texttt{backend/app/system\_prompt.txt} 及第~\ref{sec:detailed-implementation}~章第~\ref{subsec:nlq-impl}~节叙述对应；若正文、附录与仓库文件三者存在出入，以仓库当前版本为准。
+本附录给出提示词的完整分块内容与少样本示例，供读者对照正文实现或在答辩演示中复现。对应的提示词文件位于仓库 \texttt{backend/app/system\_prompt.txt}，与第~\ref{sec:detailed-implementation}~章第~\ref{subsec:nlq-impl}~节的说明一致；如二者有出入，以仓库当前文件为准。
 
 \subsection{提示词分块}
 
 \paragraph{（1）角色定义。}
-首先明确由大语言模型（Large Language Model, LLM）在只读前提下生成 Cypher，禁止写操作。
+告知模型它的任务是根据用户问句生成 Cypher 查询语句，且生成的语句必须是只读的，不允许包含任何写操作。
 
 \paragraph{（2）Schema 描述。}
-详细描述知识图谱的多标签结构：
+向模型说明当前图数据库的节点与关系结构：
 \begin{itemize}
-    \item 基础标签：:item（所有道具的父类，包含通用属性ID, Name, Type, Disc, GetWay）
-    \item 复合标签：:item:block（方块，继承:item并添加MineTool, ToolLevel属性）、:item:monster（生物，继承:item并添加Life, Attack属性）
-    \item 其他标签：:group（分组）、:recipe（配方）、:smelt（熔炼）、:device（设备）
-    \item 关系类型：IN\_GROUP、CONSUMES、PRODUCES、DROPS、TOOLMINEDROPS等12种关系
+    \item 基础标签：\texttt{:item}，通用属性含 ID、Name、Type、Disc、GetWay，所有道具节点均带此标签
+    \item 方块节点带 \texttt{:item:block} 双标签，在通用属性基础上增加 MineTool、ToolLevel
+    \item 生物节点带 \texttt{:item:monster} 双标签，增加 Life、Attack
+    \item 其他标签：\texttt{:group}（分组）、\texttt{:recipe}（配方）、\texttt{:smelt}（熔炼）、\texttt{:device}（设备）
+    \item 关系类型：\texttt{IN\_GROUP}、\texttt{CONSUMES}、\texttt{PRODUCES}、\texttt{DROPS}、\texttt{TOOLMINEDROPS} 等 12 种
 \end{itemize}
 
 \paragraph{（3）多标签查询语法。}
@@ -26,10 +27,12 @@
 \end{itemize}
 
 \paragraph{（4）路径查询与返回形态。}
-引导生成返回 Path 的查询，并可用无方向关系扩大模式匹配。错误、次优与可接受示例见第~\ref{sec:detailed-implementation}~章正文；路径返回较仅返回孤立节点更利于后端 \texttt{echarts\_converter.py} 从 Neo4j 记录中恢复用于绘图的边信息。无向与有向在 Cypher 语义上不等价：无向在探索性问句中可扩大命中，亦可能引入额外边，属提示策略选择而非普适优劣。
+本块引导模型优先返回路径，即使用 \texttt{RETURN path} 而非仅返回孤立节点。返回路径时，后端可以直接从记录中提取节点与边，用于绘制关系图；若只返回孤立节点，边信息丢失，前端无法展示实体之间的连接关系。
+
+关于查询方向：无向关系与有向关系在 Cypher 语义上并不等价。在探索性问句中使用无向关系可以扩大命中范围，但也可能匹配到额外的边。本文将此作为提示策略的一个选项，不作为普遍性结论。
 
 \paragraph{（5）少样本示例（few-shot）补充。}
-以下标题中“方块挖掘”“生物掉落”等来自本文案例数据，仅作模式演示。
+以下标题中"方块挖掘""生物掉落"等来自本文案例数据，仅作模式演示。
 
 \begin{lstlisting}[language=cypher, caption={方块挖掘（无方向路径）}]
 -- 深积岩用什么工具挖
@@ -57,4 +60,4 @@ RETURN path LIMIT 20
 
 \subsection{部署与调参中的经验性说明}
 
-在固定界面与表~\ref{tab:nlq-category} 所列人工走查（第~\ref{sec:system-test}~章）之外，实现过程中曾观察：在本文数据上，优先 \texttt{RETURN path} 与无向关系有利于表格与力导向图同屏展示；多标签 \texttt{:item:block} 等较旧版桥接关系路径更短；\texttt{Name CONTAINS} 适合含复合名称的道具；\texttt{\$param} 与黑名单为工程上的注入与写操作防护。上述为经验性归纳，不构成与未建立基线或公开数据集对比的客观评测结论。
+在表~\ref{tab:nlq-category} 的自然语言实例测试之外，实现过程中还有以下几点观察。优先使用 \texttt{RETURN path} 与无向关系，有利于表格与力导向关系图同时展示。多标签方案（\texttt{:item:block} 等）使查询路径比旧版桥接关系方案更短，更易于模型理解和生成。\texttt{Name CONTAINS} 适合含复合名称的道具查询。\texttt{\$param} 参数化与关键字黑名单是防止写操作误用的工程措施。以上均为实现过程中的经验性观察，不构成与公开基准数据集的对照评测。

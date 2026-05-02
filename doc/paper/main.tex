@@ -16,6 +16,14 @@
 \addcontentsline{toc}{section}{摘要}
 \begin{abstract}
 
+知识图谱以图结构表示实体及实体间的关系，可展示数据中隐含的知识联系，在知识管理、智能问答与推荐等领域应用较广。在属性图数据库中，查询实体之间的关系通常需要使用专门的图查询语言，使用者须掌握相应的语法规则与数据库结构，且查询结果以表格方式呈现，难以直观反映图结构信息。这为非数据库专业的普通用户设置了两类门槛：一是须专门学习查询语言，二是难以从表格结果中直观理解实体间的关联。
+
+本文设计并实现了基于自然语言的知识图谱查询与可视化系统（系统代号 neo4jSlave），采用浏览器/服务器（B/S）架构。用户在浏览器中以中文提出问题，后端先获取当前图数据库的节点标签与关系类型等结构信息，连同问句一并送入大语言模型，得到只读的参数化 Cypher 查询语句；语句经应用层安全校验后在 Neo4j 图数据库中执行。查询结果以表格与可交互关系图两种形式同步呈现。
+
+验证分为自动化测试与自然语言实例测试两部分。自动化测试覆盖接口行为、安全约束以及查询结果到图结构的转换逻辑，38 条用例均已通过。自然语言实例测试以《迷你世界》游戏知识图谱为测试对象，对 21 条中文问句逐条评判，17 条得到可接受的查询结果，通过率约为 81\%。
+
+本系统为缺少数据库专业背景的用户提供了从中文问句到知识图谱图形化浏览的完整通路，适用于领域知识库的轻量查询入口与教学演示等场景。
+
 \end{abstract}
 
 \begin{thesiskeywords}
@@ -27,6 +35,11 @@
 \phantomsection
 \addcontentsline{toc}{section}{Abstract}
 \begin{thesisabstracten}
+Knowledge graphs represent entities and their relationships in a graph structure, enabling intuitive access to the knowledge embedded in a database. They are widely applied in knowledge management, question answering, and recommendation systems. Querying a property graph database typically requires a dedicated graph query language: users must understand node labels, relationship types, and query syntax, while results are returned as flat tables that do not convey the topology of the graph. These two barriers---learning the query language and interpreting tabular results---make knowledge graphs inaccessible to non-specialist users.
+
+This thesis presents neo4jSlave, a browser/server system for natural-language querying and visualisation of knowledge graphs. When a user submits a Chinese question, the backend retrieves a summary of the current graph schema (node labels and relationship types) and passes it together with the question to a large language model, which returns a read-only, parameterised Cypher statement. The statement is validated by an application-layer safety module before execution in Neo4j. Results are returned as both a table and an interactive node--link diagram rendered by ECharts in the browser.
+
+Evaluation consists of automated tests and a manual walkthrough. The automated suite (38 test cases) covers API contracts, the read-only safety validator, and graph conversion logic; all cases passed. The manual walkthrough tested 21 Chinese questions against the Mini World game knowledge graph under a fixed model and acceptance protocol; 17 questions (81\%) received acceptable results. The system provides a complete pipeline from natural-language input to graph visualisation, lowering the access barrier for domain knowledge bases and supporting educational demonstrations.
 \end{thesisabstracten}
 \thesiskeywordsen{Knowledge Graph; Natural Language Processing; Cypher Query; Neo4j; Large Language Model; Data Visualization; FastAPI}
 
@@ -43,13 +56,84 @@
 
 \section{系统概述}
 
-\subsection{}
+\subsection{研究背景与意义}
+
+知识图谱以有向图描述实体及实体间的关系，节点代表实体，边代表关系，形成能够揭示数据内在联系的知识表示形式。这种组织方式在知识管理、智能问答与个性化推荐等任务中应用较广，已成为信息系统领域的重要基础设施\cite{ref17}。在工程实现层面，知识图谱的落地路线主要分为两类：以三元组为基础的 RDF 模型，以及以节点关系为基础的属性图模型。RDF 模型适合开放数据互联与本体推理；属性图在节点和边上直接附加键值属性，贴近业务建模，便于迭代维护\cite{ref1,ref3}。本文采用属性图路线，以 Neo4j 图数据库存储和查询知识图谱，对应的图查询语言为 Cypher。
+
+在属性图数据库中，查询实体及其关系通常需要书写 Cypher 语句。这要求使用者预先掌握节点标签、关系类型与方向、模式匹配语法以及属性条件的写法，还需要能够理解以表格形式返回的查询记录。对于偶尔需要查询的非专业用户，上述学习成本较高；而仅有表格结果也难以直观呈现"谁与谁相连"这类拓扑信息。
+
+近年来，大语言模型（Large Language Model，LLM）在自然语言到结构化查询任务上取得了显著进展\cite{ref4,ref11}，使"用户以中文提问、系统自动生成 Cypher"这一工程路线具备实现条件。将自然语言接口与图形化结果展示相结合，可以有效降低非专业用户的使用门槛，使其无需专门学习 Cypher 即可完成知识图谱的基本查询与浏览。
+
+本文以《迷你世界》游戏知识图谱为测试场景，设计并实现了一套基于自然语言的知识图谱查询与可视化系统。从实践角度看，该系统为领域知识库提供了轻量的浏览入口，适用于教学演示、跨角色协作与业务查询等场景。从方法角度看，本文将自然语言生成、应用层安全约束与图形化结果展示组织为一条完整的可运行链路，提供可复现的工程实现路径。
+
+\subsection{国内外研究现状}
+
+\subsubsection{知识图谱的存储与查询}
+
+知识图谱的数据组织与查询主要有两条技术路线。第一条是 RDF 与 SPARQL：该路线将知识表示为主谓宾三元组，便于开放发布与跨数据集互联，并可结合本体进行逻辑推理\cite{ref17}。第二条是属性图：以节点和有向关系表示实体结构，在节点或关系上直接附加属性，查询语言围绕模式匹配与路径展开。已有研究从图数据管理、存储引擎与查询优化角度，探讨了图数据库在索引、事务与可扩展性上的关键问题\cite{ref1,ref2,ref3}。
+
+在工程选型上，当数据已以属性图形式组织、目标是以较少组件交付可运行 Web 查询服务时，Neo4j 在文档、驱动生态与社区资源上均较为成熟\cite{ref12}。然而，仅完成"数据入库与语句可执行"并不足以解决终端用户的使用问题——查询入口仍是手动编写 Cypher 时，用户仍需掌握当前图数据库的结构与语法规则。这一缺口是引入自然语言接口的直接动因。
+
+\subsubsection{自然语言到结构化查询}
+
+将自然语言转换为可执行的结构化查询语句是降低数据库使用门槛的核心方法。文本到 SQL（Text-to-SQL）是该方向中研究积累最为丰富的任务；综述工作表明，影响生成质量的两类关键因素是对当前数据库结构的感知能力与生成语句的可执行性\cite{ref5}。这一结论对自然语言到 Cypher 任务同样具有参考价值。
+
+在属性图场景下，自然语言到 Cypher（Text2Cypher）任务已有专项研究。结果表明，在不针对该任务专门训练模型的情况下，零样本生成对复杂语义、多跳约束与细粒度条件的处理仍存在不稳定性；通过有监督微调可在评测指标上取得提升\cite{ref16}。因此，工程系统除依赖模型本身外，还需结合 Schema 感知的提示设计与执行后处理来提升生成质量。
+
+\subsubsection{大语言模型与知识图谱的协同}
+
+大语言模型与知识图谱的协同研究涵盖多个方向，包括以图结构为模型补充外部知识、统一符号与向量表示，以及辅助推理与增强结果可解释性\cite{ref11}。在自然语言查询子场景中，两者分工相对清晰：大语言模型负责将问句转化为候选查询语句，图数据库负责确定性执行并返回结构化结果，应用层负责执行前后的安全约束与结果整理\cite{ref4,ref9,ref11}。
+
+这种结构兼顾了灵活性与可控性，但也面临若干风险：模型生成的语句可能与实际图结构不符，同一问句在不同调用下可能输出不一致的结果，以及执行权限被误用等。针对这些风险，需要通过规则约束与执行前后的验证机制加以抑制。本文采用"受约束生成结合应用层校验"的工程路径，在通用大语言模型与已有属性图数据的条件下，构建可复现的中文问句查询服务。
+
+\subsection{主要工作与论文组织}
+
+本文的主要工作围绕四个方面展开。第一，设计并实现了以 B/S 架构为基础的知识图谱查询与可视化系统，后端基于 FastAPI 提供自然语言查询、直接 Cypher 查询与图数据库结构摘要三类接口，前端使用原生 HTML/JavaScript 实现单页面交互，以 ECharts 绘制可交互的关系图。第二，在自然语言查询路径上，系统先获取当前图数据库的结构信息，连同用户问句注入提示词后送入大语言模型，得到只读的参数化 Cypher 语句。第三，在执行链路上，所有进入数据库的语句须经应用层统一校验，包括写操作关键字过滤、参数占位符一致性检查、查询超时与返回行数上限控制。第四，以《迷你世界》知识图谱为领域数据，完成自动化测试与自然语言实例测试，对系统的功能正确性与查询效果进行验证。
+
+本文其余章节组织如下：第 2 章介绍系统的开发环境与关键技术选型；第 3 章对系统进行可行性与需求分析；第 4 章给出系统的整体架构与各功能模块的设计；第 5 章描述各模块的实现细节；第 6 章给出系统测试结果与分析。
 
 \newpage
 
-\section{}
-\subsection{系统架构与数据流}
+\section{系统开发环境与技术选型}
 
+\subsection{开发与运行环境}
+\label{subsec:repo-and-paths}
+
+本系统在 GNU/Linux 环境下开发与调试，典型发行版为 Ubuntu 22.04 LTS 和 Debian 12。宿主机需部署可访问的 Neo4j 实例，既可连接本机服务（如 \texttt{bolt://127.0.0.1:7687}），也可连接局域网或云主机上的远程实例。后端使用 Python 3.10 及以上版本，通过虚拟环境管理第三方依赖，主要依赖包括 FastAPI、neo4j 驱动、httpx 与 pytest。前端采用原生 HTML/CSS/JavaScript，无需额外构建步骤。版本控制使用 Git，源代码托管于 GitHub：\url{https://github.com/OWALabuy/neo4jSlave}。
+
+系统运行所依赖的数据库连接信息与大语言模型 API 密钥等敏感配置，通过环境变量注入。仓库中提供 \texttt{.env.example} 文件列出所需变量的键名，部署时参照该文件在本地配置对应值即可。
+
+\subsection{关键技术选型}
+
+本系统的技术路线围绕三项目标构建：降低查询入口门槛、增强结果可理解性、控制生成语句的执行风险。
+
+FastAPI 基于 Starlette 与 Pydantic，支持异步路由与请求体自动校验。与 Flask 相比，其异步特性更适合同时处理大语言模型网络调用与数据库 IO 的混合场景；与 Django 相比，其体量更轻，契合本系统"单一服务托管静态前端"的部署形态\cite{ref6,ref10}。
+
+Neo4j 使用属性图模型与 Cypher 查询语言，社区文档与驱动生态均较为成熟，且支持多标签节点。多标签特性与本文领域数据中道具、方块、生物之间的继承式建模一致\cite{ref7,ref12}。未选用 JanusGraph 或 ArangoDB 的主要原因是本课题已有 Neo4j 导入管线与实测数据，同时 Cypher 在大语言模型训练语料中覆盖较好，有利于提示词设计。
+
+大语言模型通过 OpenAI 兼容的 HTTPS 接口接入，端点与模型名由环境变量配置，便于在不修改业务代码的情况下切换不同服务商\cite{ref4,ref9}。实例测试时使用阿里云通义百炼平台的 qwen-turbo 模型。
+
+ECharts 是 Apache 基金会的开源可视化库，关系图组件支持力导向布局与拖拽缩放交互，适合在 Web 单页面中嵌入使用\cite{ref8}。各组件与候选方案的对比概括见表~\ref{tab:tech-compare}。
+
+\begin{table}[H]
+    \centering
+    \caption{技术选型对比}
+    \label{tab:tech-compare}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{组件} & \textbf{本系统} & \textbf{备选方案一} & \textbf{备选方案二} \\
+        \midrule
+        Web 框架 & FastAPI & Flask & Django \\
+        图数据库 & Neo4j & JanusGraph & ArangoDB \\
+        可视化 & ECharts & D3.js & Cytoscape \\
+        模型接口 & OpenAI 兼容 HTTPS & 本地部署模型 & 其他厂商 API \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{系统总体架构与数据流}
+
+系统采用分层架构：浏览器中的页面（表示层）、FastAPI 应用（业务逻辑层）、Neo4j 官方 Python 驱动（数据访问层），以及外部的大语言模型 HTTPS 服务，如图~\ref{fig:architecture}所示。
 
 \begin{figure}[H]
     \centering
@@ -58,11 +142,27 @@
     \label{fig:architecture}
 \end{figure}
 
+自然语言查询的主要数据流如下：用户在浏览器中提交中文问句，请求发至 FastAPI；后端先获取当前图数据库的节点标签与关系类型，将其与问句一同写入提示词，发送至大语言模型；模型返回包含 Cypher 语句与参数的结构化输出；后端对语句进行只读校验与参数一致性检查，通过后在 Neo4j 只读会话中执行；查询结果经转换模块整理为节点—边结构与表格字段，返回给前端；浏览器使用 ECharts 绘制关系图，并以表格展示属性数据。
+
+高级用户也可绕过自然语言层，直接通过 \texttt{/run-cql} 接口提交 Cypher 语句。该路径与自然语言路径共用同一套安全校验、执行封装与结果转换逻辑，保证两条入口的执行语义一致。
 
 \newpage
 
 \section{系统分析}
 
+\subsection{可行性分析}
+
+从技术可行性看，Web 框架、图数据库、大语言模型 HTTPS 服务与浏览器端可视化均有成熟实现。后端可在单机完成"服务启动—图库连接—JSON 返回"的基本链路；前端使用 ECharts 直接消费后端返回的结构化图数据，完成关系图绘制。各组件接口清晰，不存在无法跨越的工程障碍。
+
+从经济可行性看，开发期成本主要为人力，运行期成本主要为大语言模型的 API 调用费用。Neo4j 社区版与所用 Python 依赖包均可零许可费使用；系统通过查询超时与返回行数上限控制单次调用的资源消耗，使运行成本维持在可预期范围内。
+
+从运行可行性看，终端用户仅需通用浏览器即可使用本系统，无需安装专用客户端。自然语言查询与直接 Cypher 查询在同一页面切换，系统同时展示生成的查询语句，便于用户核对意图与结果的一致性，也适合课程演示与教学对照场景。
+
+\subsection{需求分析}
+
+\subsubsection{系统边界与用例}
+
+系统直接服务两类用户。第一类是终端用户，通过浏览器输入中文问句，查看知识图谱的图形化结果，通常不具备 Cypher 编写能力。第二类是高级用户，可直接提交 Cypher 语句，用于调试、对照自然语言生成结果或进行教学演示。两类用户均通过同一 Web 前端访问后端接口。系统的外部依赖包括大语言模型服务与 Neo4j 图数据库，两者均作为独立服务存在，不包含在本文实现的系统边界之内。系统用例如图~\ref{fig:use-case-placeholder}所示。
 
 \begin{figure}[H]
     \centering
@@ -71,7 +171,11 @@
     \label{fig:use-case-placeholder}
 \end{figure}
 
+\subsubsection{功能需求}
 
+系统的功能需求围绕"能查询、结果可理解、可安全执行"三类目标展开，共包含六项功能。自然语言查询是面向终端用户的主入口，用户输入中文问句后，系统调用大语言模型生成只读的参数化 Cypher 语句，经安全校验通过后执行，并将结果以图谱与表格的形式返回。直接 Cypher 查询通过 \texttt{/run-cql} 接口提供，主要用于调试与教学对照，与自然语言入口共用同一套安全校验与执行逻辑。
+
+知识图谱可视化将查询结果中的节点、关系与路径映射为可在浏览器中拖拽缩放的力导向关系图，便于观察实体之间的拓扑连接。数据表格与关系图并行展示，用于呈现节点的文本属性与数值字段。图数据库结构查询通过 \texttt{/schema} 接口提供当前图库的节点标签、关系类型与关键属性列表，既作为自然语言生成前的上下文输入，也供用户直接查阅。安全约束作为横切功能作用于两条执行路径，在语句进入数据库前过滤写操作关键字、检查参数占位符完整性，并与查询超时、返回行数上限共同控制执行风险。各功能对应的用户故事见表~\ref{tab:user-stories}。
 
 \begin{table}[H]
     \centering
@@ -83,18 +187,35 @@
         \textbf{编号} & \textbf{用户故事} & \textbf{验收要点} \\
         \midrule
         US-1 & 作为终端用户，我希望用中文自然语言描述查询意图，以便无需编写 Cypher 即可探索知识图谱。 & \texttt{POST /nlq} 返回 200 时含可渲染的 \texttt{graph}/\texttt{table} 与回显的生成语句；非法或危险语句被拦截。 \\
-        US-2 & 作为高级用户，我希望在“Cypher”模式下直接提交只读查询，以便复现、对比自然语言生成的语句。 & \texttt{POST /run-cql} 与 NL 链路共用同一套校验与执行语义；参数化占位符与请求体一致时执行成功。 \\
+        US-2 & 作为高级用户，我希望在"Cypher"模式下直接提交只读查询，以便复现、对比自然语言生成的语句。 & \texttt{POST /run-cql} 与 NL 链路共用同一套校验与执行语义；参数化占位符与请求体一致时执行成功。 \\
         US-3 & 作为终端用户，我希望查询结果以力导向关系图展示，以便直观看到实体之间的路径与关联。 & 响应体 \texttt{graph.nodes/links} 可被前端 ECharts 正确解析；支持拖拽、缩放等基本交互。 \\
         US-4 & 作为终端用户，我希望同时看到表格化属性，以便阅读长文本或数值字段。 & 同一响应中 \texttt{table} 与图谱分区展示；列键与记录一致。 \\
-        US-5 & 作为高级用户或终端用户，我希望查看当前库的Schema 摘要，以便理解可问的标签与关系类型。 & \texttt{GET /schema} 返回可供前端或人工阅读的摘要；NL 链路在生成前拉取 Schema。 \\
+        US-5 & 作为高级用户或终端用户，我希望查看当前库的 Schema 摘要，以便理解可问的标签与关系类型。 & \texttt{GET /schema} 返回可供前端或人工阅读的摘要；NL 链路在生成前拉取 Schema。 \\
         US-6 & 作为系统运维方，我希望对外暴露的执行通道默认拒绝写操作与危险调用，以便在误配置账号或模型异常时仍守住安全底线。 & 黑名单关键字与参数校验对 \texttt{/nlq}、\texttt{/run-cql} 均生效；写类语句返回明确错误。 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
+\subsubsection{非功能需求}
+
+安全性方面，系统需在数据库账号权限控制之外，在应用层构建独立的语句级防护。即便 Neo4j 账号被配置为只读，模型生成或用户提交的语句中仍可能包含写操作或高危管理命令。系统在语句进入数据库前进行关键字黑名单匹配，并可选择在执行前请求数据库生成执行计划以进一步验证，默认关闭以减少额外数据库负载。
+
+性能方面，自然语言路径包含一次大语言模型 API 调用，通常耗时约 1 至 3 秒。在此基础上，数据库查询应保持在毫秒至数百毫秒量级，前端绘图应在可接受时间内完成。系统对单次查询设置超时时间与返回行数上限，避免单次请求占用过多资源。
+
+可扩展性方面，系统将连接信息与密钥放入环境变量，并在程序结构上区分路由层、数据库客户端层与结果转换层，使替换某一组件时的影响范围局部化。
+
+易用性方面，用户在同一页面完成"提问—查看生成语句—查看图谱与表格—修改提问"的完整循环。接口在请求不合法时返回可读的错误说明，而非笼统的服务器错误码。
+
 \newpage
 
 \section{系统设计}
+\label{sec:system-design}
+
+\subsection{设计原则与模块关联总览}
+
+系统设计遵循三条原则。其一为职责分离：自然语言生成、语句校验、数据库访问、结果转换与浏览器展示在代码边界上相互独立，避免一处修改引发不可预期的连锁影响。其二为横切安全：所有进入 Neo4j 的语句适用同一安全与参数策略，自然语言入口与直接 Cypher 入口不产生执行语义上的差异。其三为结果可核对：生成的查询语句与拒绝原因均可回显给调用方，便于用户核对系统理解是否与提问意图一致。
+
+系统核心功能划分为五个模块，如图~\ref{fig:modules}所示。自然语言模块产生查询意图，安全模块位于执行之前，执行模块负责访问 Neo4j，转换模块处理查询结果，可视化模块消费转换后的结构化数据。各模块在主数据流中的具体衔接关系见第~\ref{sec:detailed-implementation}~章。
 
 \begin{figure}[H]
     \centering
@@ -103,6 +224,13 @@
     \label{fig:modules}
 \end{figure}
 
+\subsection{核心功能模块设计}
+
+\subsubsection{自然语言查询模块}
+
+自然语言查询模块负责将中文问句转化为可执行的 Cypher 语句，是面向终端用户的核心入口。该模块先从数据访问层获取当前图数据库的 Schema 摘要，再将其与用户问句按固定提示词格式组装，调用大语言模型获得包含查询语句与参数的结构化输出，最后将结果交由安全模块验证。主要交互顺序见图~\ref{fig:nlq-flow}。
+
+提示词采用系统约束与少量示例相结合的策略，重点说明多标签 Schema 的用法、路径式 \texttt{RETURN path} 返回形式以及参数化占位符的要求，引导模型生成利于前端可视化的只读查询语句。模型生成的语句须经安全校验通过后方可执行；生成成功仅表示模型侧完成，不等于语句可直接执行。
 
 \begin{figure}[H]
     \centering
@@ -111,6 +239,15 @@
     \label{fig:nlq-flow}
 \end{figure}
 
+\subsubsection{Cypher 执行模块}
+
+Cypher 执行模块服务于调试、教学演示和已知正确语句的验证场景，允许高级用户绕过大语言模型、直接提交只读 Cypher 语句。该模块与自然语言入口共用 Neo4j 客户端及同一套只读校验与参数校验逻辑，保证两条执行路径在安全策略上的一致性。查询成功后，结果进入与自然语言入口相同的转换路径，前端以同一套图表字段渲染结果。
+
+\subsubsection{安全校验模块}
+
+安全校验模块位于两条执行入口之后、Neo4j 执行之前。该模块与数据库驱动的超时设置共同构成"语句级 + 会话级"的双层约束，安全校验流程如图~\ref{fig:security-flow}所示。
+
+安全机制包括三类。第一类是关键字黑名单：对语句文本中的写操作关键字（\texttt{CREATE}、\texttt{MERGE}、\texttt{DELETE}、\texttt{SET} 等）进行正则匹配，命中则拒绝执行。第二类是可选执行计划预检：由环境变量控制，默认关闭；开启后在执行前请求数据库生成 \texttt{EXPLAIN} 计划以发现异常访问形态。第三类是参数一致性校验：语句中的 \texttt{\$param} 占位符须在请求体中有对应的同名参数，防止参数遗漏或不匹配。
 
 \begin{figure}[H]
     \centering
@@ -119,6 +256,9 @@
     \label{fig:security-flow}
 \end{figure}
 
+\subsubsection{可视化模块}
+
+可视化模块解决数据库返回记录与浏览器展示结构之间的格式差异。Neo4j 返回的记录可能包含节点、关系或路径对象，而 ECharts 关系图需要明确的 \texttt{nodes}/\texttt{links} 结构。系统将转换逻辑集中在后端，前端只消费约定好的 \texttt{graph}/\texttt{table} 字段，减少页面中的适配代码，也便于单独测试转换逻辑。图数据转换流程如图~\ref{fig:data-convert}所示。转换后，前端根据节点标签设置类别，以关系图展示拓扑结构，以表格展示属性与数值字段。
 
 \begin{figure}[H]
     \centering
@@ -136,9 +276,9 @@
 
 \subsubsection{架构演进}
 
-早期曾考虑兼容阿里云 GDB（Graph Database）等不支持同一节点多标签的图引擎。在该约束下，无法直接使用 \texttt{:item:block}、\texttt{:item:monster} 这类复合标签表达“方块/生物是一种道具”的继承语义，只能将方块、生物与通用道具拆成不同节点，再通过业务 ID 用桥接关系（即额外增加的中间节点或关系，用于在语义上等效继承，而非图数据库原生的多标签机制；历史上曾建模为 PLACE、SUMMON 等）与道具节点相连。
+早期曾考虑兼容阿里云 GDB 等不支持同一节点多标签的图引擎。在该约束下，无法直接使用 \texttt{:item:block}、\texttt{:item:monster} 这类复合标签表达"方块/生物是一种道具"的继承语义，只能将方块、生物与通用道具拆成不同节点，再通过业务 ID 用桥接关系（历史上曾建模为 PLACE、SUMMON 等）与道具节点相连。
 
-该单标签桥接方案会拉长查询路径。自然语言转 Cypher 时，模型需要记住“先找道具，再经 PLACE 或 SUMMON 跳到方块/生物”的固定模式，生成错误的概率随之上升。同时，这种建模与用户对“方块和生物也是道具类别”的直观理解不一致，维护成本较高。
+该单标签桥接方案会拉长查询路径。自然语言转 Cypher 时，模型需要记住"先找道具，再经 PLACE 或 SUMMON 跳到方块/生物"的固定模式，生成错误的概率随之上升。同时，这种建模与用户对"方块和生物也是道具类别"的直观理解不一致，维护成本较高。
 
 当前实现已取消 GDB 兼容路径，数据仅面向 Neo4j 导入与查询。方块与生物直接采用多标签节点建模，不再使用 PLACE、SUMMON 等桥接关系。提示词设计与测试用例均以当前多标签模型为准。
 
@@ -148,7 +288,7 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
 
 \subsubsection{E-R图}
 
-实体—关系图（Entity--Relationship Diagram，简称 E-R 图）在传统教材中多用于关系型表结构设计。本文图~\ref{fig:er-diagram}借用该图示习惯概括领域实体与联系；底层存储为 Neo4j 属性图，而非将每条记录展开为关系表中的行。需要说明的是，图中画法与传统关系型数据库（表、主键、外键）的书写习惯不同：本文采用“节点标签 + 关系类型”的表示法，图中使用复合标签表示继承关系，如 \texttt{:item:block} 表示“同时具有 \texttt{:item} 与 \texttt{:block} 标签的节点”，即方块继承道具的通用属性并增加专属属性。
+实体—关系图（Entity--Relationship Diagram，简称 E-R 图）在传统教材中多用于关系型表结构设计。本文图~\ref{fig:er-diagram}借用该图示习惯概括领域实体与联系；底层存储为 Neo4j 属性图，而非将每条记录展开为关系表中的行。图中采用"节点标签 + 关系类型"的表示法，复合标签表示继承关系，如 \texttt{:item:block} 表示同时具有 \texttt{:item} 与 \texttt{:block} 标签的节点，即方块继承道具的通用属性并增加专属属性。
 
 \begin{figure}[H]
     \centering
@@ -159,7 +299,7 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
 
 \subsubsection{节点类型}
 
-为帮助读者从关系型数据库思维过渡到图数据库思维，表~\ref{tab:node-types}中的“标签”列并非关系表名，而是 Neo4j 节点类型标识。以 \texttt{:item} 为例，前导冒号是 Cypher 中“标签”的语法；\texttt{:item:block} 表示同一节点可带多个标签，而不是两张表做联结后的结果。
+表~\ref{tab:node-types}中的"标签"列是 Neo4j 节点类型标识，而非关系表名。以 \texttt{:item} 为例，前导冒号是 Cypher 中标签的语法；\texttt{:item:block} 表示同一节点同时带有两个标签，而不是两张表联结后的结果。
 
 \begin{table}[H]
     \centering
@@ -208,7 +348,7 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
 
 \subsubsection{数据规模}
 
-本系统使用的知识图谱数据规模如表~\ref{tab:data-scale}所示。表中各类节点按互斥口径统计：占比列为占节点总计的百分比，设备类因数量极少写作``$<$0.1\%''。关系条数按 Neo4j 中有向关系实例计数；读者可用 \texttt{MATCH ()-[r]->() RETURN count(r)} 在库内复核，与导入脚本一致。
+本系统使用的知识图谱数据规模如表~\ref{tab:data-scale}所示。表中各类节点按互斥口径统计：占比列为占节点总计的百分比，设备类因数量极少写作``$<$0.1\%''。关系条数按 Neo4j 中有向关系实例计数。
 
 \begin{table}[H]
     \centering
@@ -235,7 +375,7 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
 
 \subsection{本章小结}
 
-设计原则概括为职责分离、横切安全与可观测性；总体架构以分层方式划分浏览器页面、FastAPI 业务层、Neo4j 访问层与大语言模型外部服务。核心功能模块按请求进入、语句校验、数据库执行与结果展示的顺序衔接；数据库设计说明多标签模型、实体—关系图示、节点与关系类型及数据规模，并阐明 Schema 对自然语言查询与可视化的约束。上述内容为第~\ref{sec:detailed-implementation}~章详细实现与测试验收提供直接依据。
+本章确立了系统设计的三条原则：职责分离、横切安全与结果可核对；总体架构以分层方式划分浏览器页面、FastAPI 业务层、Neo4j 访问层与大语言模型外部服务。核心功能模块按请求进入、语句校验、数据库执行与结果展示的顺序衔接；数据库设计说明了多标签模型的演进过程、实体—关系图示、节点与关系类型及数据规模，并阐明 Schema 结构对自然语言查询与可视化效果的影响。上述内容为第~\ref{sec:detailed-implementation}~章的详细实现提供设计依据。
 
 \newpage
 
@@ -263,12 +403,12 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
     \end{tabular}
 \end{table}
 
-表~\ref{tab:api}中``方法''列：GET 多用于读取页面或元数据，POST 多用于携带 JSON 正文提交待执行内容。``认证''列在本仓库演示版本中均为``否''，表示应用内未集成登录与令牌校验；课程或内网演示可直接使用，若面向公网部署，宜在网关、反向代理或独立认证服务侧另行接入身份校验，而非仅依赖本表所列端点。
+表~\ref{tab:api}中``方法''列：GET 多用于读取页面或元数据，POST 多用于携带 JSON 正文提交待执行内容。``认证''列在本仓库演示版本中均为``否''，表示应用内未集成登录与令牌校验；课程或内网演示可直接使用，若面向公网部署，宜在网关或反向代理侧另行接入身份校验。
 
 \subsection{自然语言查询模块的设计与实现}
 \label{subsec:nlq-impl}
 
-自然语言查询模块负责将中文问句映射为参数化、只读、便于路径可视化的 Cypher。为使模型生成结果与当前图库一致，后端在调用大语言模型（Large Language Model, LLM）前先拉取 Schema 摘要，并将其与用户问句一并写入提示词（即将约束说明与问句组合后送往模型的固定文字）。模型返回结果被约束为 JSON，主要字段为 \texttt{cql} 与 \texttt{params}，便于后续安全校验及在 Neo4j 侧按名称绑定参数取值。
+自然语言查询模块负责将中文问句映射为参数化、只读、便于路径可视化的 Cypher。为使模型生成结果与当前图库一致，后端在调用大语言模型前先拉取 Schema 摘要，并将其与用户问句一并写入提示词。模型返回结果被约束为 JSON，主要字段为 \texttt{cql} 与 \texttt{params}，便于后续安全校验及在 Neo4j 侧按名称绑定参数取值。
 
 对外入口为表~\ref{tab:api}中的 \texttt{POST /nlq}。实现上，FastAPI 根据 URL 路径将请求分发至对应处理函数（路由），编排``取 Schema、调用 \texttt{llm\_client.generate\_cypher}、进入安全模块、访问 Neo4j、调用转换器''的流水线。以下给出请求与响应的数据形状，与时序图~\ref{fig:nlq-flow}一致。
 
@@ -297,15 +437,15 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
 }
 \end{lstlisting}
 
-提示词与生成策略可概括为四点：限定只读查询，注入当前库 Schema，说明多标签与路径式 \texttt{RETURN path} 的使用方式，并要求输出 JSON。仅返回孤立节点时，前端难以恢复边信息，因此提示词倾向于引导模型返回路径。完整标签、关系类型、多组少样本示例（文献与工程中常称 few-shot，即在提示词中给出少量输入输出范例）与调参说明见附录\ref{app:prompt-supplement}。正文仅保留一个代表性示例：
-\begin{lstlisting}[language=cypher, caption={合成问句与路径式返回（与附录中其余少样本示例同型）}]
+提示词与生成策略可概括为四点：限定只读查询，注入当前库 Schema，说明多标签与路径式 \texttt{RETURN path} 的使用方式，并要求输出 JSON。仅返回孤立节点时，前端难以显示边信息，因此提示词倾向于引导模型返回路径。完整标签、关系类型与多组少样本示例见附录\ref{app:prompt-supplement}。正文仅保留一个代表性示例：
+\begin{lstlisting}[language=cypher, caption={合成问句与路径式返回}]
 -- 木料能合成什么
 MATCH path = (material:item)-[:CONSUMES]-(r:recipe)-[:PRODUCES]-(product:item)
 WHERE material.Name CONTAINS '木料'
 RETURN path LIMIT 20
 \end{lstlisting}
 
-调用与解析的实现摘录如下。自然语言模块将系统提示词与用户问句拼装为 OpenAI 兼容的对话补全接口请求（路径通常为 \texttt{/chat/completions}），并要求响应体为 JSON，以便提取 \texttt{cql} 与 \texttt{params}。
+调用与解析的实现摘录如下。自然语言模块将系统提示词与用户问句拼装为 OpenAI 兼容的对话补全接口请求，并要求响应体为 JSON，以便提取 \texttt{cql} 与 \texttt{params}。
 
 \begin{lstlisting}[language=Python, caption={LLM 生成 Cypher（llm\_client.py 摘录）}]
 async def generate_cypher(self, nlq, schema_hint, limit):
@@ -325,7 +465,7 @@ async def generate_cypher(self, nlq, schema_hint, limit):
 
 \subsection{图数据访问与 Cypher 执行模块的设计与实现}
 
-图数据访问与 Cypher 执行模块将最终进入数据库的查询收敛到统一的 Neo4j 客户端封装。会话使用只读访问模式（Neo4j 驱动层面对会话施加读权限标记），查询携带数据库名与超时配置，返回记录字典与列键序，供转换模块继续处理。\texttt{GET /schema} 为自然语言链路和人工浏览提供标签、关系摘要；\texttt{POST /run-cql} 为高级用户提供与自然语言入口相同的执行语义；\texttt{GET /health} 供部署脚本或编排系统周期性访问，以判断进程是否存活（健康检查）。路由层在通过 \texttt{cql\_validator} 校验后才调用 \texttt{run\_read}。下列代码摘录展示只读会话与超时换算。
+任何进入 Neo4j 的查询都由同一个客户端封装统一处理。每次会话以只读模式打开，确保驱动层面不允许写操作。超时时间由配置项以毫秒给出，换算为秒后传入驱动，防止单次查询长时间占用连接。路由层先经过 \texttt{cql\_validator} 的安全校验，通过后才调用 \texttt{run\_read}，将记录列表与列名序列一并返回给转换模块。下列代码展示只读会话的建立与超时换算方式。
 
 \begin{lstlisting}[language=Python, caption={Neo4j 只读查询（neo4j\_client.py 摘录）}]
 def run_read(self, cql: str, params: Dict[str, Any] | None = None):
@@ -340,7 +480,7 @@ def run_read(self, cql: str, params: Dict[str, Any] | None = None):
         return records, list(result.keys())
 \end{lstlisting}
 
-仓库内 \texttt{pytest} 对 API 与校验器做契约级验证（即用断言检验路径、HTTP 状态码与响应 JSON 字段是否与约定一致）。终端测试用例全部通过时的输出示例见图~\ref{fig:screenshot-pytest}；测试范围与断言口径见第~\ref{sec:system-test}~章。
+仓库中使用 \texttt{pytest} 对各 HTTP 端点做断言测试，验证路径、状态码与响应字段是否符合约定。全部用例通过时的终端输出示例见图~\ref{fig:screenshot-pytest}；测试范围与断言口径见第~\ref{sec:system-test}~章。
 
 \begin{figure}[H]
     \centering
@@ -351,7 +491,7 @@ def run_read(self, cql: str, params: Dict[str, Any] | None = None):
 
 \subsection{结果转换与可视化模块的设计与实现}
 
-Neo4j 驱动返回的记录可能同时包含节点、关系和路径对象，而 ECharts 的关系图组件需要统一的 \texttt{nodes}/\texttt{links} 结构（节点列表及连接两端的有向边列表）。因此，后端在 JSON 响应中并行返回 \texttt{graph} 与 \texttt{table}，使前端既能展示拓扑，也能展示属性。转换过程主要包括遍历记录、识别节点和关系、生成唯一节点 ID、提取关系端点、去重节点以及处理仅有节点而无边的退化情形。核心逻辑位于 \texttt{echarts\_converter.py}；下列摘录展示关系边入库时如何保证端点节点先行入表。
+Neo4j 驱动返回的记录中可能混有节点、关系和路径对象，而前端关系图需要明确区分节点集合与边集合。为此，后端设置专门的转换模块，将出库记录整理为 \texttt{graph} 与 \texttt{table} 两部分，以便前端分别绘制关系图和展示属性表格。转换的主要工作是遍历记录、提取节点与关系、按元素 ID 去重，并处理仅有节点而没有边的情形。核心逻辑在 \texttt{echarts\_converter.py} 中实现，下列代码展示处理一条关系时如何确保两端节点先被写入。
 
 \begin{lstlisting}[language=Python, caption={图数据转换（echarts\_converter.py 摘录）}]
 def add_rel(rel: graph.Relationship) -> None:
@@ -383,7 +523,7 @@ def add_rel(rel: graph.Relationship) -> None:
 
 \subsection{安全与约束模块的设计与实现}
 
-安全模块以横切方式作用于 \texttt{/nlq} 与 \texttt{/run-cql}。在调用 Neo4j 前，系统先对语句做只读关键字黑名单匹配，再检查 \texttt{\$param} 占位符与请求体参数是否一致；可选 \texttt{EXPLAIN} 预检由配置项控制，默认关闭以降低图库负载。即便数据库账号配置为只读，应用层仍应拒绝明显写操作及 Neo4j 管理类过程调用（例如形如 \texttt{CALL dbms.*}、意在修改实例配置或执行管理命令的语句），并向调用方返回可读错误。校验逻辑集中在 \texttt{cql\_validator.py}，下列黑名单与表~\ref{tab:readonly-test} 中测试用例对应：
+任何进入 \texttt{/nlq} 或 \texttt{/run-cql} 的语句，在交给 Neo4j 执行之前都要先经过安全校验模块。校验器对语句文本做正则匹配，拦截 \texttt{CREATE}、\texttt{MERGE}、\texttt{DELETE}、\texttt{SET} 等写操作关键字，以及形如 \texttt{CALL dbms.*} 的管理命令，命中时直接返回错误，不进入执行环节。即便 Neo4j 账号本身已配置为只读，应用层的这一检查仍有必要，因为提交的语句中可能出现预期之外的高危形态。可选的 \texttt{EXPLAIN} 预检由配置项控制，默认关闭，以避免增加数据库的额外开销。校验逻辑集中在 \texttt{cql\_validator.py}，下列黑名单与表~\ref{tab:readonly-test} 中测试用例对应：
 
 \begin{lstlisting}[language=Python, caption={只读校验黑名单（与 cql\_validator.py 一致）}]
 WRITE_BLACKLIST = [
@@ -399,13 +539,13 @@ WRITE_BLACKLIST = [
 ]
 \end{lstlisting}
 
-除上述关键字拦截外，系统未对 \texttt{CALL} 所调用的自定义存储过程（例如常用扩展库 APOC 提供的辅助过程）做白名单约束。部署假设为：图库以只读账号或只读副本访问；服务置于内网，或经反向代理（将对外域名与端口统一转发至内网服务地址）并配合鉴权后再暴露，从而将可执行 Cypher 的攻击面与误用面限制在可信主体内。若在不可信网络环境下对外开放接口，应另加网关层策略或扩展校验逻辑。
+系统目前未对 \texttt{CALL} 所调用的自定义存储过程建立允许列表，因此部署时需要满足一定的环境前提：图库以只读账号或只读副本连接，服务置于内网，或经反向代理并配合鉴权后再对外暴露。满足这些前提时，能够执行 Cypher 的请求来源已限定在可信范围内。若需在不可信网络中直接暴露接口，应在网关层添加额外的访问控制，或扩展校验逻辑的限制规则。
 
-参数占位符与请求体一致性检验的实现要点如下：使用正则表达式提取 Cypher 中的 \texttt{\$param}，与请求体提供的参数键对照，确保必需参数齐全。\texttt{/run-cql} 与 \texttt{/nlq} 共用该逻辑；路由实现位于源码树 \texttt{backend/app/} 下，路径约定见第~\ref{subsec:repo-and-paths}~节。
+参数一致性校验通过正则表达式提取 Cypher 语句中所有的 \texttt{\$param} 占位符，再与请求体中的参数键逐一比对，确保二者完全匹配。\texttt{/run-cql} 与 \texttt{/nlq} 共用这一逻辑，路由层的实现位于 \texttt{backend/app/} 下，具体路径约定见第~\ref{subsec:repo-and-paths}~节。
 
 \subsection{本章小结}
 
-本章按四个核心模块给出详细设计与关键实现摘录：自然语言模块交代生成策略、请求/响应数据形状与调用代码；完整提示词与多组少样本示例见附录\ref{app:prompt-supplement}；图数据访问与执行模块统一只读会话、超时与各端点契约；结果转换与可视化模块说明记录到 \texttt{nodes}/\texttt{links} 的映射；安全与约束模块以前置校验拦截高风险语句并检查参数完整性。上述实现与第~\ref{sec:system-design}~章设计相对应；测试的组织与判定口径见第~\ref{sec:system-test}~章。
+本章围绕四个实现模块展开。自然语言模块说明了提示词策略、请求响应结构与调用代码，完整提示词与少样本示例见附录\ref{app:prompt-supplement}；图数据访问模块统一了只读会话与超时控制；结果转换模块实现了从出库记录到 \texttt{nodes}/\texttt{links} 的映射；安全模块以前置校验拦截高风险语句并验证参数完整性。各模块的实现与第~\ref{sec:system-design}~章的设计相对应，测试的组织与判定口径见第~\ref{sec:system-test}~章。
 
 \newpage
 
@@ -414,36 +554,34 @@ WRITE_BLACKLIST = [
 
 \subsection{测试目的与方法}
 
-本章回答两类验证问题：其一，接口契约、安全校验与结果转换是否在程序层面按约定运行；其二，在既定领域图数据上，真实中文问句经自然语言链路能否得到评判者可接受的结果。
+本章的系统测试分为两类。第一类是自动化测试，使用 pytest 对接口约定、只读校验与图数据转换等程序行为做断言验证；其中 \texttt{/nlq} 对大语言模型的调用替换为固定的假返回，以保证测试可在离线条件下重复运行，不依赖云端配额。第二类是自然语言实例测试，在固定模型、图数据与书面判定协议下，对一组真实中文问句逐条评判，直接衡量系统端到端的查询效果。
 
-系统测试分为自动化测试与人工走查。自动化测试使用 Python 测试框架 \texttt{pytest}，通过脚本调用后端路由并断言 HTTP 状态码与响应 JSON 是否与实现一致（下文统称接口契约）；覆盖只读黑名单、参数占位符一致性以及 Neo4j 返回记录到前端图结构的转换等逻辑。其中自然语言接口 \texttt{/nlq} 在自动化中对大语言模型的调用替换为预先设定的假返回（Mock），以避免评测依赖云端配额并保证多次运行结果可比对。人工走查则在固定模型、固定图数据与书面判定协议下进行：评判者逐条核对生成语句与查询结果是否满足协议中的通过条件，度量的是端到端可用性，而非某一函数的单元隔离测试。
-
-两类测试回答的问题不同：自动化测试说明代码行为是否与仓库内约定一致；人工走查说明在当前模型与数据版本下自然语言入口的实际可用程度。分工、局限与可外推范围见表~\ref{tab:test-scope}。
-
-与表~\ref{tab:nlq-category} 对应的人工走查环境与采样参数见表~\ref{tab:eval-runtime}。更换大语言模型服务端点、模型名、采样温度（temperature，控制生成结果的随机程度）或图数据导入版本后，应重新执行走查并重填统计表。自动化用例件数以仓库当前 \texttt{pytest} 收集结果为准；本文所写 38 条对应撰写时的提交版本。
+两类测试回答的问题不同。自动化测试说明代码行为是否符合仓库约定；自然语言实例测试说明在当前模型与数据版本下，系统自然语言查询入口的实际可用程度。各自的覆盖范围与结论适用条件见表~\ref{tab:test-scope}。
 
 \begin{table}[H]
     \centering
     \captionsetup{justification=centering, singlelinecheck=false}
-    \caption[自动化与人工走查测试分工表]{自动化测试与人工走查的分工与可外推范围}
+    \caption[自动化测试与自然语言实例测试分工表]{自动化测试与自然语言实例测试的分工与结论适用范围}
     \label{tab:test-scope}
     \small
     \setlength{\tabcolsep}{4pt}
     \begin{tabular}{>{\RaggedRight\arraybackslash}p{0.12\linewidth} >{\RaggedRight\arraybackslash}p{0.4\linewidth} >{\RaggedRight\arraybackslash}p{0.4\linewidth}}
         \toprule
-        & \textbf{自动化 \texttt{pytest}} & \textbf{人工 NLQ 走查} \\
+        & \textbf{自动化 \texttt{pytest}} & \textbf{自然语言实例测试} \\
         \midrule
-        主要覆盖 & \texttt{tests/test\_cql\_validator.py}：只读/黑名单/EXPLAIN 关断路径等；\texttt{tests/test\_api.py}：\texttt{/health}、\texttt{/schema}、\texttt{/run-cql}、\texttt{/nlq} 在 Mock 下的状态码与 JSON 契约；\texttt{tests/test\_echarts\_converter.py}：\texttt{records\_to\_graph} 等结构。 & 协议 \texttt{doc/paper/nlq\_eval\_protocol.md} 中 21 问句、通过判据、日期与端点/模型记录；在真实 Neo4j 与真实大模型下执行。 \\
-        不覆盖 & 不连接真实 Neo4j；\texttt{/nlq} 对 LLM 使用 Mock，不测自然语言语义与真实延迟。 & 非多模型、非盲法对照；不单独构成可与公开基准测试之综合排名直接对应之结论。 \\
-        可外推性 & 在相同代码版本上可复现接口与拦截行为、转换器 fixture 上性质。 & 比例与类别统计仅在表~\ref{tab:eval-runtime} 所载固定环境、数据批次与协议下成立。 \\
+        主要覆盖 & \texttt{tests/test\_cql\_validator.py}：只读/黑名单/EXPLAIN 关断路径等；\texttt{tests/test\_api.py}：\texttt{/health}、\texttt{/schema}、\texttt{/run-cql}、\texttt{/nlq} 在 Mock 下的状态码与 JSON 约定；\texttt{tests/test\_echarts\_converter.py}：\texttt{records\_to\_graph} 等结构。 & 协议 \texttt{doc/paper/nlq\_eval\_protocol.md} 中 21 条问句、通过判据、日期与端点/模型记录；在真实 Neo4j 与真实大模型下执行。 \\
+        不覆盖 & 不连接真实 Neo4j；\texttt{/nlq} 对 LLM 使用 Mock，不测自然语言语义与真实延迟。 & 非多模型、非盲法对照；不可直接与公开基准测试的综合排名对应。 \\
+        适用范围 & 在相同代码版本上可复现接口与拦截行为、转换器用例性质。 & 比例与类别统计仅在表~\ref{tab:eval-runtime} 所载固定环境、数据版本与协议下成立。 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
+自然语言实例测试所用的模型端点、模型名称与图数据版本等配置见表~\ref{tab:eval-runtime}。更换其中任一项后，应重新执行测试并更新表~\ref{tab:nlq-category} 中的统计数据。自动化用例件数以仓库当前 \texttt{pytest} 收集结果为准；本文所列 38 条对应撰写时的提交版本。
+
 \begin{table}[H]
     \centering
     \captionsetup{justification=centering, singlelinecheck=false}
-    \caption[人工走查环境配置表]{与表~\ref{tab:nlq-category} 对应之人工走查环境}
+    \caption[自然语言实例测试环境配置表]{自然语言实例测试环境配置}
     \label{tab:eval-runtime}
     \small
     \setlength{\tabcolsep}{5pt}
@@ -455,27 +593,25 @@ WRITE_BLACKLIST = [
         \texttt{LLM\_API\_BASE} & 阿里云通义百炼 OpenAI 兼容端点，示例为 \url{https://dashscope.aliyuncs.com/compatible-mode/v1}；密钥只经环境注入。 \\
         \texttt{LLM\_MODEL} & \texttt{qwen-turbo}。 \\
         其它 & 后端请求体中 \texttt{temperature=0.1}；与 \texttt{nlq\_eval\_protocol.md} 中可登记字段（如 top\_p）同一口径。 \\
-        Neo4j & 多标签图数据与正文数据库设计一致；\texttt{NEO4J\_*} 见表~\ref{tab:env-repro}。 \\
+        Neo4j & 多标签图数据与正文数据库设计一致。 \\
         代码与数据 & 以当时 \texttt{git rev-parse --short HEAD} 在\url{https://github.com/OWALabuy/neo4jSlave} 的提交为参照；图数据以导入脚本或导出版本号为准。 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-说明：自动化测试当前共 38 个用例，覆盖 Cypher 校验、图数据转换与 API 契约；其中 \texttt{/nlq} 相关用例对 LLM 使用 Mock，故自动化套件不度量真实自然语言语义正确率。表~\ref{tab:nlq-category} 所述 21 条为人工走查记录，结论仅在表~\ref{tab:eval-runtime} 所列环境下成立。
+本章测试的组织与第~\ref{sec:detailed-implementation}~章的四个实现模块保持对应：自然语言查询模块包含实例测试部分，图数据访问模块验证各端点的约定行为，结果转换模块验证记录到图结构的映射，安全模块验证只读黑名单与参数校验。
 
-本章测试编排与第~\ref{sec:detailed-implementation}~章的四个核心模块一致：自然语言查询（含端到端效果）、图数据访问与 Cypher 执行（\texttt{/health}、\texttt{/schema}、\texttt{/run-cql} 等契约）、结果转换与可视化（\texttt{records\_to\_graph} 及界面）、安全与约束（只读黑名单与参数校验）。
-
-以下给出自动化测试的环境与命令，并摘录仓库 \texttt{tests/} 中与表~\ref{tab:readonly-test}、表~\ref{tab:api-test} 及图数据转换逻辑相对应的断言代码。
+以下给出自动化测试的运行命令，并从仓库 \texttt{tests/} 中摘录与表~\ref{tab:readonly-test}、表~\ref{tab:api-test} 及图数据转换逻辑对应的典型断言。
 
 \paragraph{环境与命令}
 在仓库根目录安装依赖（参见 \texttt{README.md}）后，于终端执行：
 \begin{verbatim}
 python -m pytest tests/ -v
 \end{verbatim}
-\texttt{tests/conftest.py} 将后端源码目录加入 Python 模块搜索路径（\texttt{sys.path}），使测试代码可直接加载应用对象；API 测试使用 FastAPI 提供的内存客户端（TestClient）构造请求并读取响应，无需启动浏览器或监听真实网络端口。Neo4j、大语言模型等外部依赖通过 \texttt{unittest.mock.patch} 在测试运行时替换为假对象，从而在离线条件下验证路由与安全策略仍能按约定分支执行。
+\texttt{tests/conftest.py} 将后端源码目录加入搜索路径，使测试代码可直接加载应用对象。API 测试使用 FastAPI 内置的测试客户端构造 HTTP 请求，无需启动服务进程或占用网络端口。Neo4j 与大语言模型等外部依赖在测试运行时替换为假对象，确保套件在离线条件下也能验证路由分支与安全策略的执行是否正确。
 
 \paragraph{样例断言 A：只读校验器（摘录）}
-下列断言分别对应“合法只读通过”与“写操作被拦截”：
+下列断言分别对应"合法只读通过"与"写操作被拦截"：
 
 \begin{lstlisting}[language=Python, caption={tests/test\_cql\_validator.py 摘录}]
 def test_simple_match_is_safe(self):
@@ -519,22 +655,20 @@ def test_basic_node_conversion(self, sample_records):
     assert node_ids == {"i:1", "i:2", "i:3"}
 \end{lstlisting}
 
-上述命令跑通后，终端应对各用例输出 \texttt{PASSED}；运行截图见图~\ref{fig:screenshot-pytest}。
+命令执行成功后，终端会对每个用例输出 \texttt{PASSED}；运行截图见图~\ref{fig:screenshot-pytest}。
 
 \subsection{分模块测试}
 
-本节按第~\ref{sec:detailed-implementation}~章的四个实现模块分别汇总测试结果，使测试对象与模块边界一致。
+本节按第~\ref{sec:detailed-implementation}~章的四个实现模块分别汇总测试结果，测试对象与模块边界保持一致。
 
 \subsubsection{自然语言查询模块测试}
 
-本小节评估大语言模型参与时的自然语言查询效果。评估对象为协议内 21 条中文问句，按 8 类整理；在表~\ref{tab:eval-runtime} 所列环境下由评判者逐条判定是否可接受。表~\ref{tab:nlq-category} 中``准确率''列指各类别内被判为通过的问句数占该类问句总数的比例；``总计''行为全部 21 条的通过比例（81.0\%）。该统计用于说明当前系统在本文领域图数据上的端到端表现，不作为公开题集或多模型横向排名。典型问句见表~\ref{tab:nlq-cases}。
-
-% 问句原文、所用模型及“通过”判定细则见仓库 \texttt{doc/paper/nlq\_eval\_protocol.md}，便于答辩复现与增补。
+本节给出自然语言实例测试的结果。测试对象为书面判定协议中 21 条中文问句，按 8 个查询类别整理，在表~\ref{tab:eval-runtime} 所列环境下逐条评判。表~\ref{tab:nlq-category} 统计各类别的通过数量与比例，``总计''行为全部 21 条问句的整体通过率（81\%）；典型问句见表~\ref{tab:nlq-cases}。
 
 \begin{table}[H]
     \centering
     \captionsetup{justification=centering, singlelinecheck=false}
-    \caption[自然语言走查按类统计]{自然语言查询走查按类统计}
+    \caption[自然语言实例测试按类统计]{自然语言实例测试按类统计}
     \label{tab:nlq-category}
     \begin{tabular}{lccc}
         \toprule
@@ -549,13 +683,13 @@ def test_basic_node_conversion(self, sample_records):
         复杂查询 & 2 & 1 & 50.0\% \\
         边缘情况 & 2 & 1 & 50.0\% \\
         \midrule
-        \textbf{总计} & \textbf{21} & \textbf{17} & \textbf{81.0\%} \\
+        \textbf{总计} & \textbf{21} & \textbf{17} & \textbf{81\%} \\
         \bottomrule
     \end{tabular}
 \end{table}
 {\small 注：本表为 2026-04-06 按协议问句实测汇总；更换表~\ref{tab:eval-runtime} 中任一项后应重测并重填。}
 
-从统计结果看，道具查找、合成查询、掉落查询和生物查询表现较稳定，这说明多标签 Schema 与路径型提示对常见探索问句具有一定适配性。失败主要集中在方块细分问法、分组查询、复杂查询和边缘问句中。其原因通常不是接口不可用，而是问句中的自然语言表达与图库属性键之间存在差异。例如，用户以中文分组名发问时，模型可能直接匹配 \texttt{:group} 的数值型 \texttt{ID}；又如，多实体对比或依赖 \texttt{StationLabel} 的问句，容易生成过严或不合法的条件。上述问题说明，后续优化应重点加强实体映射、属性说明和复杂问句拆解。
+道具查找、合成查询、掉落查询和生物查询四类的通过率均为 100\%，表明多标签 Schema 与路径型提示对常见探索问句有较好的适配性。失败案例集中在方块细分问法、分组查询、复杂查询和边缘问句中，原因通常是自然语言表达与图库属性键之间存在差异。以分组查询为例，用户以中文分组名发问时，模型可能直接匹配 \texttt{:group} 的数值型 \texttt{ID}；涉及多实体对比或依赖 \texttt{StationLabel} 的问句，容易生成过严或不合法的查询条件。这些情形说明，后续优化应重点加强实体映射、属性说明和复杂问句的分解处理。
 
 为观察数据建模调整对自然语言查询的影响，表~\ref{tab:arch-compare} 给出旧桥接式建模与当前多标签建模的回溯性对比。
 
@@ -570,13 +704,13 @@ def test_basic_node_conversion(self, sample_records):
         方块查询 & 0\% & 66.7\% \\
         生物查询 & 50\% & 100\% \\
         道具查找 & 75\% & 100\% \\
-        总体平均 & 38.1\% & 81.0\% \\
+        总体平均 & 38.1\% & 81\% \\
         \bottomrule
     \end{tabular}
 \end{table}
-{\small 注：``旧架构''列来自迁移至当前多标签 Neo4j 之前的走查或开发记录，用于说明工程调整前后的直观差异；该列不是与表~\ref{tab:nlq-category} 同一次执行得到的配对控制实验。``新架构''列与表~\ref{tab:nlq-category} 中相应类别一致。}
+{\small 注：``旧架构''列来自迁移至当前多标签 Neo4j 之前的实测及开发记录，用于说明工程调整前后的直观差异；这一列不是与表~\ref{tab:nlq-category} 同一次执行得到的配对控制实验。``新架构''列与表~\ref{tab:nlq-category} 中相应类别一致。}
 
-该对比表明，多标签建模有助于简化道具、生物和配方链路上的查询表达。方块与分组类问句仍受自然语言歧义和属性键语义影响，需要在提示词和 Schema 说明中继续细化。
+从对比数据看，多标签建模有助于简化道具、生物和配方链路上的查询表达。方块与分组类问句仍受自然语言歧义和属性键语义的影响，需要在提示词和 Schema 说明中继续细化。
 
 典型测试用例如表~\ref{tab:nlq-cases}所示。
 
@@ -602,7 +736,7 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsubsection{安全与约束模块测试}
 
-本模块验证应用层只读校验能否拦截写入类关键字与高危形态：输入为 Cypher 字符串，预期为``允许执行''或``拒绝并给出原因''。测试用例与自动化断言对应关系见表~\ref{tab:readonly-test}；实现集中在 \texttt{cql\_validator}。
+本节测试应用层只读校验能否正确拦截写入类关键字与高危语句形态。每个测试用例的输入为一条 Cypher 字符串，预期结果为``允许执行''或``拒绝并给出原因''，与自动化断言的对应关系见表~\ref{tab:readonly-test}。
 
 \begin{table}[H]
     \centering
@@ -629,7 +763,7 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsubsection{图数据访问与Cypher执行模块测试}
 
-本模块验证各 HTTP 端点在正常输入与异常输入下的响应：例如健康检查返回约定字段、不安全或参数缺失时返回可区分的 HTTP 状态码与错误信息。测试场景与预期见表~\ref{tab:api-test}。
+本节验证各 HTTP 端点在正常与异常输入下的响应行为，包括健康检查返回约定字段、传入不安全语句或参数缺失时返回可区分的错误状态码。各场景的预期结果见表~\ref{tab:api-test}。
 
 \begin{table}[H]
     \centering
@@ -653,52 +787,43 @@ def test_basic_node_conversion(self, sample_records):
 
 \subsubsection{结果转换与可视化模块测试}
 
-结果转换模块以 \texttt{tests/test\_echarts\_converter.py} 为主，验证 Neo4j 驱动返回的记录经 \texttt{records\_to\_graph} 等函数后，能否形成字段完备的 \texttt{nodes}/\texttt{links}（见上文样例断言 C）。接口联调与前端运行中进一步确认同一 JSON 可被页面解析并绘图：界面总览见图~\ref{fig:webui}，自然语言端到端结果见图~\ref{fig:screenshot-nlq}。评判重点不在图形审美，而在于节点去重、边端点与类别字段是否与后端约定一致并可被浏览器端脚本消费。
+本节以 \texttt{tests/test\_echarts\_converter.py} 为主，验证 Neo4j 驱动返回的记录经 \texttt{records\_to\_graph} 函数处理后，能否形成字段完备的 \texttt{nodes}/\texttt{links} 结构（样例断言见前文断言 C）。在此基础上，通过接口联调与前端实际运行进一步确认：同一 JSON 可被页面正确解析并绘制为关系图，节点去重与边端点字段与后端约定一致。界面总览见图~\ref{fig:webui}，自然语言端到端效果见图~\ref{fig:screenshot-nlq}。
 
 \subsection{测试结果汇总}
 
-自动化层面：38 个 \texttt{pytest} 用例全部通过，API、参数校验、只读黑名单与结果转换行为与仓库内断言一致。自然语言层面：在表~\ref{tab:eval-runtime} 固定环境与协议下，21 条问句中 17 条被判为可接受（81.0\%），分项见表~\ref{tab:nlq-category}；该比例不可直接外推到其它模型、其它数据集或未采用同一判定协议的情形。
+自动化测试共 38 个 \texttt{pytest} 用例，全部通过。接口约定、只读拦截与图数据转换行为均与测试用例的预期一致。自然语言实例测试在表~\ref{tab:eval-runtime} 所列环境下执行，21 条问句中有 17 条判定为可接受，通过率 81\%，分项结果见表~\ref{tab:nlq-category}。
 
 \begin{thesisconclusion}
 
-本研究设计并实现了自然语言知识图谱查询与可视化系统（neo4jSlave），并在《迷你世界》属性图数据上完成应用性验证。系统面向不打算系统学习 Cypher 的终端用户，提供中文问句入口、受约束的图数据库查询执行，以及表格与关系图并行展示。
+本文针对属性图数据库使用门槛高、查询结果不直观的问题，设计并实现了一套知识图谱查询与可视化系统。系统允许用户在浏览器中以中文提问，自动生成只读的 Cypher 语句并在 Neo4j 中执行，将结果以关系图与表格两种形式同步呈现，无需用户学习图查询语言。
 
-验证结果由两类证据组成。自动化测试覆盖接口约定（请求与响应字段）、只读校验、参数检查与图数据转换，38 个 \texttt{pytest} 用例均通过。自然语言效果在表~\ref{tab:eval-runtime} 所载固定模型、图数据与人工判定协议下统计，21 条中文问句中约 81.0\% 可得到可接受结果。上述结果说明系统在既定数据与配置下形成了可运行、可检查的 HTTP 服务全链路；该自然语言比例不用于与公开 Text2Cypher 基准或未采用同一问句集的模型作排名比较。
+系统以《迷你世界》游戏知识图谱为应用场景，从两个层面完成了验证。自动化测试共 38 个用例，覆盖接口约定、只读校验与图数据转换，全部通过。对 21 条真实中文问句的逐条评判显示，17 条（81\%）得到可接受的查询结果。两类测试共同说明，系统在当前数据与配置下能够可靠运行，并能产生可供核对的查询结果。
 
 \subsection*{主要工作}
 
-（1）系统架构。系统采用前后端分离的浏览器/服务器（Browser/Server, B/S）结构：用户在浏览器中访问页面，业务逻辑与数据访问在服务端完成。FastAPI 提供表述性状态转移（REST）风格的 HTTP 接口（以 URL 路径与 HTTP 方法区分操作）；静态前端由 HTML/CSS/JavaScript 实现，关系图由 ECharts 在浏览器端绘制。
+（1）系统架构。系统采用前后端分离的浏览器/服务器结构，后端基于 FastAPI 提供自然语言查询、直接 Cypher 查询与图数据库结构摘要三类接口，前端使用原生 HTML/JavaScript 实现单页面交互，以 ECharts 绘制可交互的关系图。
 
-（2）自然语言到 Cypher。系统在提示词中注入 Schema 摘要，并要求大语言模型输出 JSON 形式的只读、参数化 Cypher，使中文问句能够进入后续校验与执行流程。
+（2）自然语言到 Cypher。后端在调用大语言模型时注入当前图数据库的结构摘要，要求模型返回只读的参数化 Cypher 语句，使中文问句能够转化为可在 Neo4j 中直接执行的图查询。
 
-（3）安全与执行。系统在执行前统一进行关键字黑名单检查、可选 \texttt{EXPLAIN} 执行计划预检（仅生成计划、不改动数据）、参数占位符校验、超时和行数限制，使自然语言入口与直接 Cypher 入口遵循同一执行规则。
+（3）安全与执行。所有进入数据库的语句在执行前须经过写操作关键字过滤、参数占位符完整性检查，以及查询超时与返回行数上限等约束，自然语言入口与直接 Cypher 入口遵循相同的执行规则。
 
-（4）数据与领域模型。系统采用 Neo4j 多标签属性图组织领域数据；节点、关系类型与数据规模见第~\ref{sec:system-design}~章第~\ref{subsec:db-design}~节。该数据用于应用性验证，展示自然语言查询、受控执行与可视化展示的完整流程。
-
-\subsection*{可核对要点}
-
-\begin{enumerate}[(1)]
-    \item 可部署的 HTTP 全链路：自然语言与直接 Cypher 经同一安全与执行层，行为可由表~\ref{tab:api}、表~\ref{tab:readonly-test} 等核对。
-    \item Schema 约束的自然语言到 Cypher 与后处理：Text2Cypher 在文献中多指自然语言到图查询语句的一类任务；与仅报告模型指标而缺少应用层细节的工作相比，本研究将只读、参数、超时等约束纳入同一可运行服务，便于复现与审计。
-    \item 在固定协议下的人工走查：表~\ref{tab:nlq-category} 的 21 条与 81.0\% 为协议内统计；中文 \texttt{Name CONTAINS} 等约束来自数据与提示选择，可迁移性取决于目标图 Schema 与部署条件。
-    \item 结果到 ECharts 的转换：\texttt{nodes}/\texttt{links} 形态与转换器用例及界面截图一致。
-\end{enumerate}
+（4）数据与领域模型。系统采用 Neo4j 多标签属性图组织《迷你世界》的道具、配方与生物数据；节点、关系类型与数据规模见第~\ref{sec:system-design}~章第~\ref{subsec:db-design}~节，用于验证自然语言查询、受控执行与可视化展示的完整流程。
 
 \subsection*{不足与展望}
 
 当前系统仍有以下不足：
 \begin{enumerate}[(1)]
-    \item 复杂查询、分组查询和多实体对比仍有失败情形，说明当前提示与 Schema 描述对复杂语义的约束能力有限。
+    \item 复杂查询、分组查询和多实体对比仍有失败情形，说明系统在理解复杂语义与精确匹配属性键方面仍有不足。
     \item 同义词和近义表达处理不足，用户使用不同名称指代同一概念时，系统仍可能无法稳定匹配。
-    \item 权限控制仍停留在应用层只读校验和部署假设层面，尚未形成完整的用户身份认证与访问控制机制。
+    \item 权限控制仅依赖应用层只读校验与部署环境假设，尚未建立完整的用户身份认证与访问控制机制。
 \end{enumerate}
 
 未来工作方向：
 \begin{enumerate}[(1)]
-    \item 引入检索增强生成（Retrieval-Augmented Generation, RAG：在生成查询语句前检索相关文本或图片段作为辅助上下文）或实体链接（将问句中的词语对齐到图中的节点与属性）方法，提高实体、属性与关系类型匹配的准确性。
-    \item 构建领域同义词与别名词表，使语义等价表述能够映射到同一图数据库对象。
+    \item 引入 RAG（检索增强生成）或实体链接技术，提高实体、属性与关系类型匹配的准确性。
+    \item 构建领域同义词与别名词表，使语义等价的表述能够映射到同一图数据库对象。
     \item 完善身份认证、访问控制和审计日志，使系统更适合在非演示环境中部署。
-    \item 研究多源图数据适配方法，使同一自然语言查询流程能够迁移到结构相近的其他领域知识图谱。
+    \item 研究多源图数据的适配方法，使同一自然语言查询流程能够迁移到结构相近的其他领域知识图谱。
 \end{enumerate}
 
 \end{thesisconclusion}
@@ -712,7 +837,7 @@ def test_basic_node_conversion(self, sample_records):
 	\bibitem{ref2}Miller J J. Graph database applications and concepts with Neo4j[C]. In: Proceedings of the Southern Association for Information Systems Conference, 2013, Article~24. \url{https://aisel.aisnet.org/sais2013/24}
 	\bibitem{ref3}Robinson I, Webber J, Eifrem E. Graph databases: new opportunities for connected data[M]. O'Reilly Media, 2015.
 	\bibitem{ref4}Brown T, Mann B, Ryder N, et al. Language models are few-shot learners[J]. Advances in Neural Information Processing Systems, 2020, 33: 1877-1901.
-	\bibitem{ref5}Qin B, et al. A survey on deep learning approaches for text-to-SQL[J]. arXiv:2208.13629, 2022. (Survey on NL-to-SQL; adjacent to NL-to-Cypher.)
+	\bibitem{ref5}Qin B, et al. A survey on deep learning approaches for text-to-SQL[J]. arXiv:2208.13629, 2022.
 	\bibitem{ref6}FastAPI. FastAPI Documentation[EB/OL]. https://fastapi.tiangolo.com/ (accessed 2026-04-06)
 	\bibitem{ref7}Neo4j Inc. Neo4j Graph Database Platform[EB/OL]. https://neo4j.com/ (accessed 2026-04-06)
 	\bibitem{ref8}Apache ECharts. ECharts Documentation[EB/OL]. https://echarts.apache.org/ (accessed 2026-04-06)
