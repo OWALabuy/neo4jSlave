@@ -35,6 +35,7 @@
 \phantomsection
 \addcontentsline{toc}{section}{Abstract}
 \begin{thesisabstracten}
+
 Knowledge graphs represent entities and their relationships in a graph structure, enabling intuitive access to the knowledge embedded in a database. They are widely applied in knowledge management, question answering, and recommendation systems. Querying a property graph database typically requires a dedicated graph query language: users must understand node labels, relationship types, and query syntax, while results are returned as flat tables that do not convey the topology of the graph. These two barriers---learning the query language and interpreting tabular results---make knowledge graphs inaccessible to non-specialist users.
 
 This thesis presents neo4jSlave, a browser/server system for natural-language querying and visualisation of knowledge graphs. When a user submits a Chinese question, the backend retrieves a summary of the current graph schema (node labels and relationship types) and passes it together with the question to a large language model, which returns a read-only, parameterised Cypher statement. The statement is validated by an application-layer safety module before execution in Neo4j. Results are returned as both a table and an interactive node--link diagram rendered by ECharts in the browser.
@@ -474,8 +475,18 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
 
 表~\ref{tab:api}中``方法''列：GET 多用于读取页面或元数据，POST 多用于携带 JSON 正文提交待执行内容。``认证''列在本仓库演示版本中均为``否''，表示应用内未集成登录与令牌校验；课程或内网演示可直接使用，若面向公网部署，宜在网关或反向代理侧另行接入身份校验。
 
-\subsection{自然语言查询模块的设计与实现}
+\subsection{自然语言查询模块}
 \label{subsec:nlq-impl}
+
+\subsubsection{模块设计}
+
+自然语言查询模块的核心设计目标是：在不要求终端用户了解 Cypher 语法的前提下，将中文问句准确映射为可对当前图库执行的只读参数化查询。
+
+接口设计上，\texttt{POST /nlq} 接收包含问句字符串的 JSON 请求体，返回生成的 Cypher 语句、执行参数、图谱结构与表格数据四部分内容。将这四部分合并在单次响应中，使前端只需发起一次请求即可完成从问句到可视化数据的全部获取，减少网络往返次数。
+
+两项设计决策对生成质量影响较大。其一，Schema 在每次请求时动态拉取而非硬编码：图数据库的标签与关系类型可能随数据导入版本变化，动态拉取确保提示词始终反映当前库状态，避免模型参考过时信息生成无法执行的语句。其二，要求模型输出参数化语句而非字符串拼接式 Cypher：参数化可防止特殊字符破坏语句结构，也使安全模块对参数占位符的一致性校验成为可能。
+
+\subsubsection{代码实现}
 
 自然语言查询模块负责将中文问句映射为参数化、只读、便于路径可视化的 Cypher。为使模型生成结果与当前图库一致，后端在调用大语言模型前先拉取 Schema 摘要，并将其与用户问句一并写入提示词。模型返回结果被约束为 JSON，主要字段为 \texttt{cql} 与 \texttt{params}，便于后续安全校验及在 Neo4j 侧按名称绑定参数取值。
 
@@ -532,7 +543,17 @@ async def generate_cypher(self, nlq, schema_hint, limit):
     return obj.get("cql", "").strip(), obj.get("params", {})
 \end{lstlisting}
 
-\subsection{图数据访问与 Cypher 执行模块的设计与实现}
+\subsection{图数据访问与 Cypher 执行模块}
+
+\subsubsection{模块设计}
+
+图数据访问模块的设计目标是为两条执行路径（自然语言入口与直接 Cypher 入口）提供统一的数据库访问接口，使上层路由层不需要直接操作驱动细节。
+
+接口设计上，\texttt{run\_read(cql, params)} 是模块对外暴露的唯一读取方法，接受语句字符串与参数字典，返回记录列表与列名序列。返回列名序列的用意是便于转换模块在构建表格字段时保持与数据库原始列的对应关系，而无需在转换时重新解析记录键名。
+
+会话设计上，模块显式指定 \texttt{default\_access\_mode="READ"} 打开只读会话，在驱动层面阻止写操作，与应用层的关键字黑名单校验形成双重约束。超时时间以毫秒为单位通过配置项传入，模块负责换算为秒后注入驱动，调用方不需要了解驱动的时间单位约定。同时，会话在 \texttt{with} 块结束时由驱动自动归还到连接池，避免长时间持有连接导致池资源耗尽。
+
+\subsubsection{代码实现}
 
 任何进入 Neo4j 的查询都由同一个客户端封装统一处理。每次会话以只读模式打开，确保驱动层面不允许写操作。超时时间由配置项以毫秒给出，换算为秒后传入驱动，防止单次查询长时间占用连接。路由层先经过 \texttt{cql\_validator} 的安全校验，通过后才调用 \texttt{run\_read}，将记录列表与列名序列一并返回给转换模块。下列代码展示只读会话的建立与超时换算方式。
 
@@ -558,7 +579,17 @@ def run_read(self, cql: str, params: Dict[str, Any] | None = None):
     \label{fig:screenshot-pytest}
 \end{figure}
 
-\subsection{结果转换与可视化模块的设计与实现}
+\subsection{结果转换与可视化模块}
+
+\subsubsection{模块设计}
+
+结果转换模块的设计目标是将 Neo4j 驱动返回的异构记录统一整理为前端 ECharts 可直接消费的节点—边结构，使前端页面不包含任何格式适配逻辑。
+
+输出数据结构设计为三部分：\texttt{nodes}（节点列表，含 ID、标签类别与属性字典）、\texttt{links}（关系列表，含起点 ID、终点 ID、关系类型与属性字典），以及 \texttt{categories}（节点类别列表，由节点标签集合导出，供 ECharts 按标签设置颜色分组）。表格字段 \texttt{table} 与图谱结构并列放在响应体顶层，供用户查阅节点的长文本属性与数值字段。
+
+节点去重是转换设计中的关键细节。当查询返回路径时，同一节点可能在不同路径段中多次出现；若不去重，前端图谱中会出现相同实体的多个副本，导致关系图边的连接混乱。转换模块按 Neo4j 元素 ID（\texttt{element\_id}）对节点做集合去重，保证每个实体在图谱中只出现一次。转换逻辑集中在后端，便于在不依赖浏览器的情况下对转换过程单独进行单元测试。
+
+\subsubsection{代码实现}
 
 Neo4j 驱动返回的记录中可能混有节点、关系和路径对象，而前端关系图需要明确区分节点集合与边集合。为此，后端设置专门的转换模块，将出库记录整理为 \texttt{graph} 与 \texttt{table} 两部分，以便前端分别绘制关系图和展示属性表格。转换的主要工作是遍历记录、提取节点与关系、按元素 ID 去重，并处理仅有节点而没有边的情形。核心逻辑在 \texttt{echarts\_converter.py} 中实现，下列代码展示处理一条关系时如何确保两端节点先被写入。
 
@@ -590,7 +621,17 @@ def add_rel(rel: graph.Relationship) -> None:
     \label{fig:screenshot-nlq}
 \end{figure}
 
-\subsection{安全与约束模块的设计与实现}
+\subsection{安全与约束模块}
+
+\subsubsection{模块设计}
+
+安全校验模块的设计目标是在 Neo4j 数据库账号权限控制之外，在应用层建立独立的语句级防线。这一防护层的必要性在于：数据库账号的只读配置可能因运维失误被覆盖，而大语言模型在极端情况下可能生成语义歧义的语句，应用层的主动拦截可以消除对账号配置的单点依赖。
+
+校验策略采用黑名单而非白名单。白名单策略（只允许特定 Cypher 模式通过）虽然更为严格，但对语句形态的约束过于收紧，会妨碍自然语言模块生成多样化只读查询的灵活性。黑名单策略明确列举禁止的写操作关键字（\texttt{CREATE}、\texttt{MERGE}、\texttt{DELETE} 等）与管理命令（\texttt{CALL dbms.*}），在不限制合法只读语句形态的前提下拦截常见威胁。
+
+校验机制共三层。第一层是关键字黑名单，覆盖最常见的写操作与高危管理命令。第二层是参数一致性校验，提取语句中的 \texttt{\$param} 占位符，与请求体参数键逐一比对，防止参数遗漏或注入。第三层是可选的 \texttt{EXPLAIN} 预检，由配置项控制，默认关闭，仅在需要进一步验证语句访问形态时开启，避免对数据库产生额外负载。
+
+\subsubsection{代码实现}
 
 任何进入 \texttt{/nlq} 或 \texttt{/run-cql} 的语句，在交给 Neo4j 执行之前都要先经过安全校验模块。校验器对语句文本做正则匹配，拦截 \texttt{CREATE}、\texttt{MERGE}、\texttt{DELETE}、\texttt{SET} 等写操作关键字，以及形如 \texttt{CALL dbms.*} 的管理命令，命中时直接返回错误，不进入执行环节。即便 Neo4j 账号本身已配置为只读，应用层的这一检查仍有必要，因为提交的语句中可能出现预期之外的高危形态。可选的 \texttt{EXPLAIN} 预检由配置项控制，默认关闭，以避免增加数据库的额外开销。校验逻辑集中在 \texttt{cql\_validator.py}，下列黑名单与表~\ref{tab:readonly-test} 中测试用例对应：
 
