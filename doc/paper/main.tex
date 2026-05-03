@@ -443,6 +443,24 @@ Neo4j 允许同一节点携带多个标签（Multiple Labels）。本文以 \tex
     \end{tabular}
 \end{table}
 
+\subsubsection{Schema 摘要与自然语言模块的衔接}
+
+数据库的节点标签与关系类型不仅是存储层面的设计，也是自然语言模块构建提示词的直接依据。系统通过 \texttt{GET /schema} 接口在运行时向调用方暴露当前图库的结构摘要：后端向 Neo4j 执行元数据查询，取得全部节点标签与关系类型，整理为列表格式后返回。下面是接口响应的示意结构：
+
+\begin{lstlisting}[language=json, caption={\texttt{GET /schema} 响应示例}]
+{
+    "labels": ["item", "block", "monster", "group", "recipe", "smelt", "device"],
+    "relationship_types": [
+        "IN_GROUP", "CONSUMES", "PRODUCES", "DROPS",
+        "TOOLMINEDROPS", "HANDMINEDROPS", "COVERS", "RUNS_ON"
+    ]
+}
+\end{lstlisting}
+
+自然语言模块在每次处理问句前拉取这份摘要，将其注入提示词，使大语言模型在生成 Cypher 时可以参考当前库的实际标签与关系名称。动态拉取而非硬编码的好处是：图库数据更新后，摘要内容在下一次请求时自动刷新；迁移到新数据库后，摘要同样自动反映新库的结构，无需另外修改代码。
+
+多标签设计在这一环节体现出具体优势。Schema 摘要中的标签以原始名称出现，提示词说明书只需用一行示范语句解释 \texttt{:item:block} 表示方块，模型就能直接生成 \texttt{MATCH (n:item:block)} 形式的查询。若改用旧版桥接方案，标签只有通用的 \texttt{:item}，模型需要额外理解"方块通过 PLACE 关系挂载在道具下"的间接映射，生成正确语句的难度明显增加。
+
 \subsection{面向其他知识图谱的迁移设计}
 \label{subsec:migration}
 
@@ -591,6 +609,8 @@ async def generate_cypher(self, nlq, schema_hint, limit):
     return obj.get("cql", "").strip(), obj.get("params", {})
 \end{lstlisting}
 
+在调用 \texttt{generate\_cypher} 之前，路由层先通过 Neo4j 客户端查询当前图库的标签与关系类型，将结果拼成纯文本摘要，作为 \texttt{schema\_hint} 参数传入。大语言模型在接收到问句时，已知当前库中存在哪些标签与关系，可以据此生成与实际图库结构一致的 Cypher 语句，而不是依赖静态提示词中可能已过时的描述。
+
 \subsection{图数据访问与 Cypher 执行模块}
 
 \subsubsection{模块设计}
@@ -700,6 +720,20 @@ WRITE_BLACKLIST = [
 系统目前未对 \texttt{CALL} 所调用的自定义存储过程建立允许列表，因此部署时需要满足一定的环境前提：图库以只读账号或只读副本连接，服务置于内网，或经反向代理并配合鉴权后再对外暴露。满足这些前提时，能够执行 Cypher 的请求来源已限定在可信范围内。若需在不可信网络中直接暴露接口，应在网关层添加额外的访问控制，或扩展校验逻辑的限制规则。
 
 参数一致性校验通过正则表达式提取 Cypher 语句中所有的 \texttt{\$param} 占位符，再与请求体中的参数键逐一比对，确保二者完全匹配。\texttt{/run-cql} 与 \texttt{/nlq} 共用这一逻辑，路由层的实现位于 \texttt{backend/app/} 下，具体路径约定见第~\ref{subsec:repo-and-paths}~节。
+
+以下代码展示参数一致性校验的核心实现。函数先提取语句中的全部占位符名称，再与请求体参数键做集合比较；若两个集合不相等，立即抛出异常，错误信息列出缺少和多余的键名，便于调试。
+
+\begin{lstlisting}[language=Python, caption={参数一致性校验（cql\_validator.py 摘录）}]
+def validate_params(cql: str, params: dict) -> None:
+    placeholders = set(re.findall(r'\$(?P<name>\w+)', cql))
+    provided = set(params.keys())
+    if placeholders != provided:
+        missing = placeholders - provided
+        extra = provided - placeholders
+        raise CqlValidationError(
+            f"参数不匹配：缺少 {missing}，多余 {extra}"
+        )
+\end{lstlisting}
 
 \subsection{本章小结}
 
@@ -848,6 +882,8 @@ def test_basic_node_conversion(self, sample_records):
 {\small 注：本表为 2026-04-06 按协议问句实测汇总；更换表~\ref{tab:eval-runtime} 中任一项后应重测并重填。}
 
 道具查找、合成查询、掉落查询和生物查询四类的通过率均为 100\%，表明多标签 Schema 与路径型提示对常见探索问句有较好的适配性。失败案例集中在方块细分问法、分组查询、复杂查询和边缘问句中，原因通常是自然语言表达与图库属性键之间存在差异。以分组查询为例，用户以中文分组名发问时，模型可能直接匹配 \texttt{:group} 的数值型 \texttt{ID}；涉及多实体对比或依赖 \texttt{StationLabel} 的问句，容易生成过严或不合法的查询条件。这些情形说明，后续优化应重点加强实体映射、属性说明和复杂问句的分解处理。
+
+从整体结果来看，81\% 的通过率说明系统在常见探索性问句上具有实用价值。道具查找、合成查询、掉落查询三类覆盖了用户最频繁的使用场景，这三类的通过率均为 100\%，表明当前 Schema 设计与提示词策略能够满足日常使用的主要需求。失败率较高的关系查询、复杂查询和边缘情况，对应的是用户描述较模糊或需要跨越多个节点的问句；这类问句在真实使用中占比相对较低，影响有限。
 
 为观察数据建模调整对自然语言查询的影响，表~\ref{tab:arch-compare} 给出旧桥接式建模与当前多标签建模的回溯性对比。
 
