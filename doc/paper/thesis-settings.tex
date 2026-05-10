@@ -158,16 +158,9 @@
   morestring=[b]",
   morecomment=[l]{//},
 }
-% 代码块等宽：Monaspace Radon（fontconfig 中须用 “Regular” 等全名；勿用 “Monaspace Radon” 会解析失败。无字体时改 basicstyle 为 \small\ttfamily 并删除本 \newfontfamily。）
-\newfontfamily\ThesisListingsBase{Monaspace Radon}[
-  UprightFont     = {Monaspace Radon Regular},
-  ItalicFont      = {Monaspace Radon Italic},
-  BoldFont        = {Monaspace Radon Bold},
-  BoldItalicFont  = {Monaspace Radon Bold Italic},
-  Scale = 0.90
-]
+% 代码块等宽：沿用正文引擎默认等宽（通常为 Latin Modern Mono 等），便于 PDF 复制与文本抽取。
 \lstset{
-  basicstyle={\ThesisListingsBase\small},
+  basicstyle={\small\ttfamily},
   breaklines=true,
   frame=single,
   backgroundcolor=\color{gray!10},
