@@ -5,6 +5,9 @@ test/
 frontend/echarts-test.html
 frontend/test-graph.json
 
+# vim产物
+*.swp
+
 # LaTeX 中间产物
 *.aux
 *.log
